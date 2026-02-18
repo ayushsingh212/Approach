@@ -1,0 +1,10 @@
+.next
+.env
+node_modules
+dist  
+build
+coverage
+
+# Logs
+logs
+*.log   

@@ -1,0 +1,168 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gold: #B8973A;
+  --gold-light: #D4AE50;
+  --gold-subtle: #F5F0E8;
+  --dark: #1A1A1A;
+  --dark-sidebar: #111111;
+  --surface: #FFFFFF;
+  --surface-secondary: #F8F7F5;
+  --border: #E8E4DC;
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B6560;
+  --text-muted: #A09890;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--surface);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+/* Gold underline tab */
+.tab-active {
+  border-bottom: 2px solid var(--gold);
+  color: var(--dark);
+}
+
+/* Input base */
+.input-base {
+  @apply w-full border-0 border-b border-surface-border bg-transparent py-3 text-sm text-dark placeholder:text-muted focus:outline-none focus:border-gold transition-colors duration-200;
+}
+
+/* Card hover */
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+}
+
+/* Stat bar */
+.stat-bar {
+  height: 2px;
+  background: var(--dark);
+  margin-top: 12px;
+}
+.stat-bar.gold {
+  background: var(--gold);
+}
+
+/* Status badges */
+.badge-delivered {
+  @apply text-xs font-mono tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1;
+}
+.badge-pending {
+  @apply text-xs font-mono tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1;
+}
+
+/* Sidebar icon active */
+.nav-icon-active {
+  @apply text-gold border-l-2 border-gold;
+}
+
+/* Animation delays */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* Animated elements */
+.animate-fade-in,
+.animate-slide-up,
+.animate-slide-in-right,
+.animate-scale-in {
+  opacity: 0;
+  animation-fill-mode: forwards;
+}
+
+/* Dark grid bg */
+.dark-grid-bg {
+  background-color: #1A1A1A;
+  background-image:
+    linear-gradient(rgba(184,151,58,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184,151,58,0.06) 1px, transparent 1px),
+    radial-gradient(circle, rgba(184,151,58,0.08) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 40px 40px;
+}
+
+/* Buttons */
+.btn-gold {
+  @apply inline-flex items-center gap-2 px-6 py-3 text-xs font-semibold tracking-[0.15em] uppercase text-white transition-all duration-200;
+  background: var(--gold);
+}
+.btn-gold:hover {
+  background: var(--gold-light);
+}
+
+.btn-primary {
+  @apply inline-flex items-center gap-2 px-6 py-3 text-xs font-semibold tracking-[0.15em] uppercase text-white bg-dark transition-all duration-200;
+}
+.btn-primary:hover {
+  background: #2a2a2a;
+}
+
+.btn-outline {
+  @apply inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold tracking-[0.12em] uppercase border transition-all duration-200;
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+.btn-outline:hover {
+  border-color: #aaa;
+  color: var(--text-primary);
+}
+
+/* Form elements */
+.form-label {
+  @apply block text-[10px] font-semibold tracking-[0.2em] uppercase mb-2;
+  color: var(--text-muted);
+}
+
+.form-input {
+  @apply w-full bg-transparent border-0 border-b py-3 text-sm outline-none transition-colors duration-200 placeholder:text-muted;
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+.form-input:focus {
+  border-color: var(--gold);
+}
+
+/* Card */
+.card {
+  @apply border p-6;
+  border-color: var(--border);
+}
+
+/* Crosshatch bg */
+.crosshatch-bg {
+  background-color: #1A1A1A;
+  background-image: 
+    linear-gradient(rgba(184,151,58,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184,151,58,0.07) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Plus pattern */
+.plus-pattern::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(184,151,58,0.12) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
