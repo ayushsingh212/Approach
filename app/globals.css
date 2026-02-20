@@ -1,88 +1,159 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ===========================
+   Theme Variables
+=========================== */
+
 :root {
-  --gold: #B8973A;
-  --gold-light: #D4AE50;
-  --gold-subtle: #F5F0E8;
-  --dark: #1A1A1A;
-  --dark-sidebar: #111111;
-  --surface: #FFFFFF;
-  --surface-secondary: #F8F7F5;
-  --border: #E8E4DC;
-  --text-primary: #1A1A1A;
-  --text-secondary: #6B6560;
-  --text-muted: #A09890;
+  --color-gold: #b8973a;
+  --color-gold-light: #d4ae50;
+  --color-gold-soft: #f5f0e8;
+
+  --color-dark: #1a1a1a;
+  --color-dark-soft: #111111;
+
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f8f7f5;
+
+  --color-border: #e8e4dc;
+
+  --color-text-main: #1a1a1a;
+  --color-text-secondary: #6b6560;
+  --color-text-muted: #a09890;
 }
 
-* {
+/* ===========================
+   Base Reset
+=========================== */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   font-family: 'DM Sans', system-ui, sans-serif;
-  background: var(--surface);
-  color: var(--text-primary);
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
+
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+/* ===========================
+   Scrollbar
+=========================== */
 
-/* Gold underline tab */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold);
+}
+
+/* ===========================
+   Typography
+=========================== */
+
+.font-display {
+  font-family: 'Playfair Display', serif;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ===========================
+   Tabs
+=========================== */
+
 .tab-active {
-  border-bottom: 2px solid var(--gold);
-  color: var(--dark);
+  border-bottom: 2px solid var(--color-gold);
+  color: var(--color-dark);
+  font-weight: 500;
 }
 
-/* Input base */
+/* ===========================
+   Inputs
+=========================== */
+
 .input-base {
-  @apply w-full border-0 border-b border-surface-border bg-transparent py-3 text-sm text-dark placeholder:text-muted focus:outline-none focus:border-gold transition-colors duration-200;
+  @apply w-full bg-transparent border-0 border-b py-3 text-sm
+         outline-none transition-colors duration-200;
+
+  border-color: var(--color-border);
+  color: var(--color-text-main);
 }
 
-/* Card hover */
+.input-base::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input-base:focus {
+  border-color: var(--color-gold);
+}
+
+/* ===========================
+   Cards
+=========================== */
+
+.card {
+  @apply border p-6 transition-all duration-200;
+  border-color: var(--color-border);
+}
+
 .card-hover {
-  @apply transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+  @apply hover:shadow-md hover:-translate-y-0.5;
 }
 
-/* Stat bar */
-.stat-bar {
-  height: 2px;
-  background: var(--dark);
-  margin-top: 12px;
-}
-.stat-bar.gold {
-  background: var(--gold);
+/* ===========================
+   Status Badges
+=========================== */
+
+.badge {
+  @apply text-xs font-mono tracking-widest px-2.5 py-1 border;
 }
 
-/* Status badges */
 .badge-delivered {
-  @apply text-xs font-mono tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1;
-}
-.badge-pending {
-  @apply text-xs font-mono tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1;
+  @apply badge text-emerald-700 bg-emerald-50 border-emerald-200;
 }
 
-/* Sidebar icon active */
+.badge-pending {
+  @apply badge text-amber-700 bg-amber-50 border-amber-200;
+}
+
+/* ===========================
+   Sidebar / Navigation
+=========================== */
+
 .nav-icon-active {
   @apply text-gold border-l-2 border-gold;
 }
 
-/* Animation delays */
-.delay-100 { animation-delay: 100ms; }
-.delay-200 { animation-delay: 200ms; }
-.delay-300 { animation-delay: 300ms; }
-.delay-400 { animation-delay: 400ms; }
-.delay-500 { animation-delay: 500ms; }
+/* ===========================
+   Animations
+=========================== */
 
-/* Animated elements */
 .animate-fade-in,
 .animate-slide-up,
 .animate-slide-in-right,
@@ -91,78 +162,145 @@ body {
   animation-fill-mode: forwards;
 }
 
-/* Dark grid bg */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* ===========================
+   Decorative Backgrounds
+=========================== */
+
+/* Dark Grid */
+
 .dark-grid-bg {
-  background-color: #1A1A1A;
+  background-color: var(--color-dark);
   background-image:
     linear-gradient(rgba(184,151,58,0.06) 1px, transparent 1px),
     linear-gradient(90deg, rgba(184,151,58,0.06) 1px, transparent 1px),
     radial-gradient(circle, rgba(184,151,58,0.08) 1px, transparent 1px);
-  background-size: 40px 40px, 40px 40px, 40px 40px;
-}
 
-/* Buttons */
-.btn-gold {
-  @apply inline-flex items-center gap-2 px-6 py-3 text-xs font-semibold tracking-[0.15em] uppercase text-white transition-all duration-200;
-  background: var(--gold);
-}
-.btn-gold:hover {
-  background: var(--gold-light);
-}
-
-.btn-primary {
-  @apply inline-flex items-center gap-2 px-6 py-3 text-xs font-semibold tracking-[0.15em] uppercase text-white bg-dark transition-all duration-200;
-}
-.btn-primary:hover {
-  background: #2a2a2a;
-}
-
-.btn-outline {
-  @apply inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold tracking-[0.12em] uppercase border transition-all duration-200;
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-.btn-outline:hover {
-  border-color: #aaa;
-  color: var(--text-primary);
-}
-
-/* Form elements */
-.form-label {
-  @apply block text-[10px] font-semibold tracking-[0.2em] uppercase mb-2;
-  color: var(--text-muted);
-}
-
-.form-input {
-  @apply w-full bg-transparent border-0 border-b py-3 text-sm outline-none transition-colors duration-200 placeholder:text-muted;
-  border-color: var(--border);
-  color: var(--text-primary);
-}
-.form-input:focus {
-  border-color: var(--gold);
-}
-
-/* Card */
-.card {
-  @apply border p-6;
-  border-color: var(--border);
-}
-
-/* Crosshatch bg */
-.crosshatch-bg {
-  background-color: #1A1A1A;
-  background-image: 
-    linear-gradient(rgba(184,151,58,0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(184,151,58,0.07) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
-/* Plus pattern */
+/* Crosshatch */
+
+.crosshatch-bg {
+  background-color: var(--color-dark);
+  background-image:
+    linear-gradient(rgba(184,151,58,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184,151,58,0.07) 1px, transparent 1px);
+
+  background-size: 40px 40px;
+}
+
+/* Plus Pattern */
+
+.plus-pattern {
+  position: relative;
+}
+
 .plus-pattern::before {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, rgba(184,151,58,0.12) 1px, transparent 1px);
+
+  background-image: radial-gradient(
+    circle,
+    rgba(184,151,58,0.12) 1px,
+    transparent 1px
+  );
+
   background-size: 40px 40px;
   pointer-events: none;
+}
+
+/* ===========================
+   Buttons
+=========================== */
+
+.btn {
+  @apply inline-flex items-center gap-2 px-6 py-3
+         text-xs font-semibold uppercase tracking-[0.15em]
+         transition-all duration-200;
+}
+
+/* Gold */
+
+.btn-gold {
+  @apply btn text-white;
+  background: var(--color-gold);
+}
+
+.btn-gold:hover {
+  background: var(--color-gold-light);
+}
+
+/* Primary */
+
+.btn-primary {
+  @apply btn text-white;
+  background: var(--color-dark);
+}
+
+.btn-primary:hover {
+  background: #2a2a2a;
+}
+
+/* Outline */
+
+.btn-outline {
+  @apply inline-flex items-center gap-2 px-4 py-2
+         text-xs font-semibold uppercase tracking-[0.12em]
+         border transition-all duration-200;
+
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.btn-outline:hover {
+  border-color: #aaa;
+  color: var(--color-text-main);
+}
+
+/* ===========================
+   Forms
+=========================== */
+
+.form-label {
+  @apply block text-[10px] font-semibold uppercase mb-2
+         tracking-[0.2em];
+
+  color: var(--color-text-muted);
+}
+
+.form-input {
+  @apply w-full bg-transparent border-0 border-b py-3 text-sm
+         outline-none transition-colors duration-200;
+
+  border-color: var(--color-border);
+  color: var(--color-text-main);
+}
+
+.form-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.form-input:focus {
+  border-color: var(--color-gold);
+}
+
+/* ===========================
+   Utility
+=========================== */
+
+.stat-bar {
+  height: 2px;
+  margin-top: 12px;
+  background: var(--color-dark);
+}
+
+.stat-bar.gold {
+  background: var(--color-gold);
 }
