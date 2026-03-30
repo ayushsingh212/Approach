@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Search, SlidersHorizontal, Download, X } from "lucide-react";
-import { transmissions } from "@/lib/data";
-import type { Transmission } from "@/types";
+import { transmissions } from "@/src/lib/data";
+import type { Transmission } from "@/src/types";
 
 export default function TransmissionsPage() {
   const [selected, setSelected] = useState<Transmission>(transmissions[0]);
@@ -12,7 +12,7 @@ export default function TransmissionsPage() {
   const filtered = transmissions.filter(
     (t) =>
       t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.recipients.some((r) =>
+      t.recipients.some((r: any) =>
         r.toLowerCase().includes(searchQuery.toLowerCase())
       )
   );

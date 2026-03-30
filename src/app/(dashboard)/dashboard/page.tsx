@@ -11,7 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { hourlyData, analyticsTopTransmissions } from "@/lib/data";
+import { hourlyData, analyticsTopTransmissions } from "@/src/lib/data";
 
 const DATE_RANGES = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "Custom"];
 

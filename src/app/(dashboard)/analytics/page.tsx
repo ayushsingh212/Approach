@@ -14,7 +14,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { engagementTrends, topCampaigns } from "@/lib/data";
+import { engagementTrends, topCampaigns } from "@/src/lib/data";
 
 const TIMEFRAMES = ["Last 7 Days", "Last 30 Days", "Last Quarter", "YTD"];
 

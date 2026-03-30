@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
-import { corporateEntities } from "@/lib/data";
+import { corporateEntities } from "@/src/lib/data";
 
 export default function ContactsPage() {
   const [searchQuery, setSearchQuery] = useState("");
