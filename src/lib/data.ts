@@ -3,7 +3,7 @@ import type {
   CorporateEntity,
   ChartDataPoint,
   Campaign,
-} from "@/types";
+} from "@/src/types";
 
 export const transmissions: Transmission[] = [
   {
