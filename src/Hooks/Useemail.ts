@@ -38,11 +38,12 @@ export function useEmails() {
       const result = await emailService.searchCompanies(filters);
       store.setCompanySearchResults(result.data, result.pagination);
       return result;
-    } catch {
+    } catch(err: any)  {
       // Keep previous results on error — UI shows empty state naturally
       store.setCompanySearchResults([], {
         page: 1, limit: 20, total: 0, totalPages: 0,
       });
+      throw err;
     } finally {
       store.setCompanySearchLoading(false);
     }

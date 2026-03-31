@@ -1,0 +1,250 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Eye, EyeOff, ChevronRight, Loader2,
+  Mail, Lock, User, KeyRound
+} from "lucide-react";
+import toast from "react-hot-toast";
+import { useAuth } from "@/src/Hooks/Useauth";
+import { RegisterPayload } from "@/src/types/user.types";
+
+export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void }) {
+  const router = useRouter();
+  const { register, login, isLoading } = useAuth();
+
+  const [showPass, setShowPass] = useState(false);
+  const [showAppPass, setShowAppPass] = useState(false);
+
+  const [form, setForm] = useState<RegisterPayload & { confirmPassword: string }>({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    senderEmail: "",
+    googleAppPassword: "",
+  });
+
+  const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!form.name.trim() || !form.email.trim() || !form.password || !form.senderEmail.trim() || !form.googleAppPassword.trim()) {
+      toast.error("All fields are required.");
+      return;
+    }
+
+    if (form.password.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
+    if (!form.senderEmail.endsWith("@gmail.com")) {
+      toast.error("Sender email must be a Gmail address.");
+      return;
+    }
+
+    const cleanApp = form.googleAppPassword.replace(/\s/g, "");
+    if (cleanApp.length !== 16) {
+      toast.error("Google App Password must be exactly 16 characters.");
+      return;
+    }
+
+    const toastId = toast.loading("Creating your account…");
+
+    try {
+      await register({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        senderEmail: form.senderEmail.trim(),
+        googleAppPassword: cleanApp,
+      });
+
+      toast.loading("Signing you in…", { id: toastId });
+      await login(form.email.trim(), form.password);
+
+      toast.success("Welcome aboard! Redirecting…", { id: toastId });
+      router.push("/dashboard");
+    } catch (err: any) {
+      toast.error(err.message ?? "Registration failed.", { id: toastId });
+    }
+  };
+
+  const inputClass =
+    "w-full px-4 py-3 lg:py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400/20 focus:border-amber-400 transition-all duration-300 text-sm disabled:opacity-60";
+
+  const labelClass =
+    "text-xs lg:text-sm font-medium text-slate-700 flex items-center gap-2";
+
+  return (
+    <form className="flex flex-col gap-4 lg:gap-5" onSubmit={handleSubmit}>
+
+      {/* Name */}
+      <div className="space-y-2">
+        <label className={labelClass}>
+          <User size={14} className="text-slate-400" />
+          Full Name
+        </label>
+        <input
+          type="text"
+          value={form.name}
+          onChange={set("name")}
+          disabled={isLoading}
+          className={inputClass}
+          placeholder="Jonathan Doe"
+        />
+      </div>
+
+      {/* Email */}
+      <div className="space-y-2">
+        <label className={labelClass}>
+          <Mail size={14} className="text-slate-400" />
+          Login Email
+        </label>
+        <input
+          type="email"
+          value={form.email}
+          onChange={set("email")}
+          disabled={isLoading}
+          className={inputClass}
+          placeholder="you@company.com"
+        />
+      </div>
+
+      {/* Passwords */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <label className={labelClass}>
+            <Lock size={14} className="text-slate-400" />
+            Password
+          </label>
+          <div className="relative">
+            <input
+              type={showPass ? "text" : "password"}
+              value={form.password}
+              onChange={set("password")}
+              disabled={isLoading}
+              className={`${inputClass} pr-10`}
+              placeholder="Min 8 chars"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass(!showPass)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600"
+            >
+              {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className={labelClass}>
+            <Lock size={14} className="text-slate-400" />
+            Confirm
+          </label>
+          <input
+            type="password"
+            value={form.confirmPassword}
+            onChange={set("confirmPassword")}
+            disabled={isLoading}
+            className={inputClass}
+            placeholder="Repeat"
+          />
+        </div>
+      </div>
+
+      {/* Sender Gmail */}
+      <div className="space-y-2">
+        <label className={labelClass}>
+          <Mail size={14} className="text-slate-400" />
+          Sender Gmail
+          <span className="ml-auto text-[10px] text-slate-400">
+            emails sent FROM this
+          </span>
+        </label>
+        <input
+          type="email"
+          value={form.senderEmail}
+          onChange={set("senderEmail")}
+          disabled={isLoading}
+          className={inputClass}
+          placeholder="yourname@gmail.com"
+        />
+      </div>
+
+      {/* App Password */}
+      <div className="space-y-2">
+        <label className={labelClass}>
+          <KeyRound size={14} className="text-slate-400" />
+          Google App Password
+          <a
+            href="https://myaccount.google.com/apppasswords"
+            target="_blank"
+            className="ml-auto text-[10px] text-amber-600 hover:underline"
+          >
+            Get one →
+          </a>
+        </label>
+
+        <div className="relative">
+          <input
+            type={showAppPass ? "text" : "password"}
+            value={form.googleAppPassword}
+            onChange={set("googleAppPassword")}
+            disabled={isLoading}
+            className={`${inputClass} pr-10 tracking-widest`}
+            placeholder="xxxx xxxx xxxx xxxx"
+          />
+          <button
+            type="button"
+            onClick={() => setShowAppPass(!showAppPass)}
+            className="absolute right-3 top-1/2 -translate-y-1/2"
+          >
+            {showAppPass ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Submit */}
+      <button
+        type="submit"
+        disabled={isLoading}
+        className="group relative inline-flex items-center justify-center px-8 py-3.5 font-medium text-white bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+      >
+        <span className="relative flex items-center gap-3">
+          {isLoading ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Creating Account…
+            </>
+          ) : (
+            <>
+              Create Account
+              <ChevronRight size={16} />
+            </>
+          )}
+        </span>
+      </button>
+
+      <p className="text-center text-sm text-slate-500">
+        Already registered?{" "}
+        <button
+          type="button"
+          onClick={onSwitchTab}
+          className="text-amber-600 hover:text-amber-700"
+        >
+          Sign in
+        </button>
+      </p>
+    </form>
+  );
+}
