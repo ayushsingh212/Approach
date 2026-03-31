@@ -36,7 +36,7 @@ export async function PUT(req: NextRequest) {
     // ── Validate App Password format ──────────────────────────────────────────
     let cleanAppPassword: string | undefined;
     if (googleAppPassword) {
-      let cleanAppPassword = googleAppPassword.replace(/\s/g, "");
+      cleanAppPassword = googleAppPassword.replace(/\s/g, "") as string;
       if (cleanAppPassword.length !== 16) {
         return NextResponse.json(
           { error: "Google App Password must be exactly 16 characters" },

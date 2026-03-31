@@ -1,5 +1,3 @@
-// src/middleware.ts  ← must be at src/ root, NOT inside app/
-
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
