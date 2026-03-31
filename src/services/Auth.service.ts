@@ -1,23 +1,20 @@
 import { signIn, signOut } from "next-auth/react";
-import { RegisterPayload } from "@/src/types/user.types";
-import { IUser } from "@/src/types/user.types";
+import { RegisterPayload, IUser } from "@/src/types/user.types";
+import api from "@/src/lib/Axios";
 
 // ─── Auth Service ─────────────────────────────────────────────────────────────
 // login / logout delegate to NextAuth; register calls the REST endpoint.
 
 export const authService = {
   /**
-   * POST /api/register
+   * POST /api/auth/register
    * Creates a new user account (validates Gmail credentials before saving).
    */
   register: async (payload: RegisterPayload): Promise<{ message: string; user: IUser }> => {
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Registration failed");
+    const { data } = await api.post<{ message: string; user: IUser }>(
+      "/auth/register",
+      payload
+    );
     return data;
   },
 
@@ -40,7 +37,7 @@ export const authService = {
    * then calls NextAuth signOut to wipe client state.
    */
   logout: async (): Promise<void> => {
-    await fetch("/api/logout", { method: "POST" });
+    await api.post("/logout");
     await signOut({ redirect: false });
   },
 };

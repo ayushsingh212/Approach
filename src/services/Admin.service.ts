@@ -7,6 +7,7 @@ import {
   UserFilters,
   PaginatedResponse,
 } from "@/src/types/admin.types";
+import api from "@/src/lib/Axios";
 
 // ─── Admin Service ────────────────────────────────────────────────────────────
 // All routes are protected at middleware level (admin role required).
@@ -21,16 +22,10 @@ export const adminService = {
   getCompanies: async (
     filters?: CompanyFilters
   ): Promise<PaginatedResponse<ICompany>> => {
-    const params = new URLSearchParams();
-    if (filters?.search)   params.set("search",   filters.search);
-    if (filters?.category) params.set("category", filters.category);
-    if (filters?.active)   params.set("active",   filters.active);
-    if (filters?.page)     params.set("page",     String(filters.page));
-    if (filters?.limit)    params.set("limit",    String(filters.limit));
-
-    const res = await fetch(`/api/admin/companies?${params.toString()}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to fetch companies");
+    const { data } = await api.get<PaginatedResponse<ICompany>>(
+      "/admin/companies",
+      { params: filters }
+    );
     return data;
   },
 
@@ -39,9 +34,9 @@ export const adminService = {
    * Fetches a single company with addedBy populated.
    */
   getCompanyById: async (id: string): Promise<ICompany> => {
-    const res = await fetch(`/api/admin/companies/${id}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Company not found");
+    const { data } = await api.get<{ company: ICompany }>(
+      `/admin/companies/${id}`
+    );
     return data.company;
   },
 
@@ -50,13 +45,10 @@ export const adminService = {
    * Adds a new company. addedBy is resolved server-side from session.
    */
   addCompany: async (payload: AddCompanyPayload): Promise<ICompany> => {
-    const res = await fetch("/api/admin/companies", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to add company");
+    const { data } = await api.post<{ company: ICompany }>(
+      "/admin/companies",
+      payload
+    );
     return data.company;
   },
 
@@ -68,13 +60,10 @@ export const adminService = {
     id: string,
     payload: UpdateCompanyPayload
   ): Promise<ICompany> => {
-    const res = await fetch(`/api/admin/companies/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to update company");
+    const { data } = await api.put<{ company: ICompany }>(
+      `/admin/companies/${id}`,
+      payload
+    );
     return data.company;
   },
 
@@ -83,11 +72,9 @@ export const adminService = {
    * Soft-deletes: sets isActive = false, does not remove the document.
    */
   deleteCompany: async (id: string): Promise<ICompany> => {
-    const res = await fetch(`/api/admin/companies/${id}`, {
-      method: "DELETE",
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to delete company");
+    const { data } = await api.delete<{ company: ICompany }>(
+      `/admin/companies/${id}`
+    );
     return data.company;
   },
 
@@ -100,15 +87,10 @@ export const adminService = {
   getUsers: async (
     filters?: UserFilters
   ): Promise<PaginatedResponse<IAdminUser>> => {
-    const params = new URLSearchParams();
-    if (filters?.search) params.set("search", filters.search);
-    if (filters?.role)   params.set("role",   filters.role);
-    if (filters?.page)   params.set("page",   String(filters.page));
-    if (filters?.limit)  params.set("limit",  String(filters.limit));
-
-    const res = await fetch(`/api/admin/users?${params.toString()}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to fetch users");
+    const { data } = await api.get<PaginatedResponse<IAdminUser>>(
+      "/admin/users",
+      { params: filters }
+    );
     return data;
   },
 
@@ -120,13 +102,10 @@ export const adminService = {
     userId: string,
     role: "user" | "admin"
   ): Promise<IAdminUser> => {
-    const res = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, role }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to update role");
+    const { data } = await api.patch<{ user: IAdminUser }>(
+      "/admin/users",
+      { userId, role }
+    );
     return data.user;
   },
 };

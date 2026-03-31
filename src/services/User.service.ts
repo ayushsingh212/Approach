@@ -1,6 +1,7 @@
 import { IUser, UpdateCredentialsPayload } from "@/src/types/user.types";
 import { PaginatedResponse } from "@/src/types/admin.types";
 import { IEmailLog, EmailLogFilters } from "@/src/types/email.types";
+import api from "@/src/lib/Axios";
 
 // ─── User Service ─────────────────────────────────────────────────────────────
 
@@ -10,9 +11,7 @@ export const userService = {
    * Returns the currently authenticated user's profile.
    */
   getProfile: async (): Promise<IUser> => {
-    const res = await fetch("/api/user");
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to fetch profile");
+    const { data } = await api.get<{ user: IUser }>("/user");
     return data.user;
   },
 
@@ -24,13 +23,10 @@ export const userService = {
   updateCredentials: async (
     payload: UpdateCredentialsPayload
   ): Promise<{ message: string; user: IUser }> => {
-    const res = await fetch("/api/user/credentials", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to update credentials");
+    const { data } = await api.put<{ message: string; user: IUser }>(
+      "/user/credentials",
+      payload
+    );
     return data;
   },
 
@@ -41,14 +37,10 @@ export const userService = {
   getSentEmails: async (
     filters?: EmailLogFilters
   ): Promise<PaginatedResponse<IEmailLog>> => {
-    const params = new URLSearchParams();
-    if (filters?.page)   params.set("page",   String(filters.page));
-    if (filters?.limit)  params.set("limit",  String(filters.limit));
-    if (filters?.status) params.set("status", filters.status);
-
-    const res = await fetch(`/api/user/sentEmails?${params.toString()}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to fetch sent emails");
+    const { data } = await api.get<PaginatedResponse<IEmailLog>>(
+      "/user/sentEmails",
+      { params: filters }
+    );
     return data;
   },
 };

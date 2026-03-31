@@ -1,5 +1,10 @@
-import { SendEmailPayload, SendEmailResponse, CompanySearchFilters } from "@/src/types/email.types";
+import {
+  SendEmailPayload,
+  SendEmailResponse,
+  CompanySearchFilters,
+} from "@/src/types/email.types";
 import { ICompany, PaginatedResponse } from "@/src/types/admin.types";
+import api from "@/src/lib/Axios";
 
 // ─── Email Service ────────────────────────────────────────────────────────────
 
@@ -10,13 +15,7 @@ export const emailService = {
    * Decrypts credentials server-side, verifies SMTP, then sends in parallel.
    */
   sendEmail: async (payload: SendEmailPayload): Promise<SendEmailResponse> => {
-    const res = await fetch("/api/email/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to send emails");
+    const { data } = await api.post<SendEmailResponse>("/email/send", payload);
     return data;
   },
 
@@ -28,15 +27,10 @@ export const emailService = {
   searchCompanies: async (
     filters?: CompanySearchFilters
   ): Promise<PaginatedResponse<ICompany>> => {
-    const params = new URLSearchParams();
-    if (filters?.search)   params.set("search",   filters.search);
-    if (filters?.category) params.set("category", filters.category);
-    if (filters?.page)     params.set("page",     String(filters.page));
-    if (filters?.limit)    params.set("limit",    String(filters.limit));
-
-    const res = await fetch(`/api/companies?${params.toString()}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to search companies");
+    const { data } = await api.get<PaginatedResponse<ICompany>>(
+      "/companies",
+      { params: filters }
+    );
     return data;
   },
 };
