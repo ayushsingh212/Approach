@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/src/lib/db";
 import UserModel from "@/src/models/UserSchema";
 import { encrypt } from "@/src/lib/encrypt";
+import { verifyGmailCredentials } from "@/src/lib/verifyGmailCredentials";
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,6 +38,11 @@ export async function POST(req: NextRequest) {
         { error: "Google App Password must be exactly 16 characters" },
         { status: 400 }
       );
+    }
+
+    const gmailCheck = await verifyGmailCredentials(senderEmail, cleanAppPassword);
+    if (!gmailCheck.valid) {
+      return NextResponse.json({ error: gmailCheck.error }, { status: 400 });
     }
 
     await connectDB();
