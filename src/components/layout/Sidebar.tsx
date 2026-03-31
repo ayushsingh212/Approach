@@ -18,7 +18,7 @@ export default function Sidebar({ isAdmin = false }: any) {
   const links = [
     { label: "Send Email", icon: Mail, path: "/" },
     { label: "History", icon: History, path: "/history" },
-    { label: "Dashboard", icon: User, path: "/dashboard" },
+    { label: "Dashboard", icon: User, path: "/profile" },
     ...(isAdmin ? [{ label: "Admin", icon: Shield, path: "/admin" }] : []),
   ];
 

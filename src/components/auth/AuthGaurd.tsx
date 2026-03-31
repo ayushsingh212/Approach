@@ -1,48 +1,28 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/src/Hooks/Useauth";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
-export default function AuthGuard({
-  children,
-  requireAdmin = false,
-}: {
-  children: React.ReactNode;
-  requireAdmin?: boolean;
-}) {
+export default function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isSessionLoading } = useAuth();
   const router = useRouter();
-  const {
-    isAuthenticated,
-    isSessionLoading,
-    isAdmin,
-    fetchProfile,
-  } = useAuth();
 
   useEffect(() => {
     if (!isSessionLoading && !isAuthenticated) {
       router.push("/login");
     }
+  }, [isSessionLoading, isAuthenticated]);
 
-    if (!isSessionLoading && requireAdmin && !isAdmin) {
-      router.push("/");
-    }
-
-    if (isAuthenticated) {
-      fetchProfile();
-    }
-  }, [isAuthenticated, isSessionLoading]);
-
-  // 🔥 Prevent UI flicker
-  if (isSessionLoading || !isAuthenticated) {
+  if (isSessionLoading) {
     return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="animate-pulse text-slate-500">
-          Loading session...
-        </div>
+      <div className="h-screen flex items-center justify-center text-gray-500">
+        Loading session...
       </div>
     );
   }
+
+  if (!isAuthenticated) return null;
 
   return <>{children}</>;
 }

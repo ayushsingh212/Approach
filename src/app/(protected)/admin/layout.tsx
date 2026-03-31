@@ -2,7 +2,7 @@
 
 import Sidebar from "@/src/components/layout/Sidebar";
 import Topbar from "@/src/components/layout/Topbar";
-import AuthGuard from "@/src/components/auth/authGaurd";
+import AuthGuard from "@/src/components/auth/AuthGaurd";
 
 export default function AdminLayout({
   children,

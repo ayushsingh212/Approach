@@ -11,7 +11,7 @@ export const authService = {
    * Creates a new user account (validates Gmail credentials before saving).
    */
   register: async (payload: RegisterPayload): Promise<{ message: string; user: IUser }> => {
-    const res = await fetch("/api/register", {
+    const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
