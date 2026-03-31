@@ -3,10 +3,17 @@ import "./globals.css";
 import Providers from "../components/Providers";
 export const metadata: Metadata = {
   title: "Approach— Excellence in Communication",
-  description: "Precision-engineered bulk mailing architecture for the discerning enterprise.",
+  description:
+    "Precision-engineered bulk mailing architecture for the discerning enterprise.",
 };
+import Sidebar from "@/src/components/layout/Sidebar";
+import Topbar from "@/src/components/layout/Topbar";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <head>
@@ -15,9 +22,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body><Providers>
-          {children}
-        </Providers></body>
+      <body>
+        <Providers>
+          <div className="flex">
+            <Sidebar />
+
+            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+              <Topbar />
+
+              <div className="flex-1 overflow-y-auto">{children}</div>
+            </div>
+          </div>
+        </Providers>
+      </body>
     </html>
   );
 }

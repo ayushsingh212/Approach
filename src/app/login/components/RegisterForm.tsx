@@ -73,7 +73,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
       await login(form.email.trim(), form.password);
 
       toast.success("Welcome aboard! Redirecting…", { id: toastId });
-      router.push("/dashboard");
+      router.push("/profile");
     } catch (err: any) {
       toast.error(err.message ?? "Registration failed.", { id: toastId });
     }

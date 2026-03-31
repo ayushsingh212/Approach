@@ -30,7 +30,7 @@ export default function LoginForm() {
     try {
       await login(email.trim(), password);
       toast.success("Welcome back! Redirecting…", { id: toastId });
-      router.push("/dashboard");
+      router.push("/profile");
     } catch (err: any) {
       toast.error(err.message ?? "Login failed.", { id: toastId });
     }

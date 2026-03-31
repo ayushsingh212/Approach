@@ -1,4 +1,5 @@
 // ─── Delivery Result (per company) ───────────────────────────────────────────
+export type StatusType = "" | "completed" | "partial" | "all_failed";
 
 export interface IDeliveryResult {
   company: string;                   // company ObjectId

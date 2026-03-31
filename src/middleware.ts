@@ -85,7 +85,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
+    "/profile/:path*",
     "/admin/:path*",
     "/authpage/:path*",
     "/login/:path*",
