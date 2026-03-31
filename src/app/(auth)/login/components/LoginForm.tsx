@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Mail, Lock, Eye, EyeOff, Loader2, ArrowRight
-} from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/src/Hooks/Useauth";
+import { getSession } from "next-auth/react";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -29,6 +28,9 @@ export default function LoginForm() {
 
     try {
       await login(email.trim(), password);
+      const session = await getSession();
+      if (!session) throw new Error("Session not established");
+      
       toast.success("Welcome back! Redirecting…", { id: toastId });
       router.push("/profile");
     } catch (err: any) {
@@ -38,7 +40,6 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-
       {/* Email */}
       <div>
         <label className="text-sm flex items-center gap-2 text-slate-600 mb-2">

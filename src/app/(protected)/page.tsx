@@ -196,7 +196,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 🚀 SEND BUTTON */}
         <button
           onClick={handleSend}
           disabled={isSending || selectedCompanies.length === 0}

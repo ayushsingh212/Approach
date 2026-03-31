@@ -1,7 +1,7 @@
 import { IUser, UpdateCredentialsPayload } from "@/src/types/user.types";
 import { PaginatedResponse } from "@/src/types/admin.types";
 import { IEmailLog, EmailLogFilters } from "@/src/types/email.types";
-import api from "@/src/lib/Axios";
+import api from "@/src/lib/axios";
 
 // ─── User Service ─────────────────────────────────────────────────────────────
 

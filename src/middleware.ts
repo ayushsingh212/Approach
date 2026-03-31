@@ -3,7 +3,7 @@ import { getToken } from "next-auth/jwt";
 
 // ─── Route protection map ─────────────────────────────────────────────────────
 //
-//  /dashboard/*   → any logged-in user
+//  /profile/*   → any logged-in user
 //  /admin/*       → role === "admin" only
 //  /authpage/*    → redirect to dashboard if already logged in
 //  /api/admin/*   → role === "admin" only (API level guard)
@@ -27,7 +27,7 @@ export async function middleware(req: NextRequest) {
   // ── 1. Already logged in → redirect away from auth pages ─────────────────
   if (pathname.startsWith("/authpage") || pathname.startsWith("/login")) {
     if (isLoggedIn) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+      return NextResponse.redirect(new URL("/profile", req.url));
     }
     return NextResponse.next();
   }
@@ -39,13 +39,13 @@ export async function middleware(req: NextRequest) {
     }
     if (!isAdmin) {
       // Logged in but not admin → send to dashboard with error
-      return NextResponse.redirect(new URL("/dashboard?error=forbidden", req.url));
+      return NextResponse.redirect(new URL("/profile?error=forbidden", req.url));
     }
     return NextResponse.next();
   }
 
   // ── 3. Protected user pages ───────────────────────────────────────────────
-  if (pathname.startsWith("/dashboard")) {
+  if (pathname.startsWith("/profile")) {
     if (!isLoggedIn) {
       const loginUrl = new URL("/authpage", req.url);
       loginUrl.searchParams.set("callbackUrl", pathname);

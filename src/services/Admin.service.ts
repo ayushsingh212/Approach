@@ -7,7 +7,7 @@ import {
   UserFilters,
   PaginatedResponse,
 } from "@/src/types/admin.types";
-import api from "@/src/lib/Axios";
+import api from "@/src/lib/axios";
 
 // ─── Admin Service ────────────────────────────────────────────────────────────
 // All routes are protected at middleware level (admin role required).

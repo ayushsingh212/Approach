@@ -4,7 +4,7 @@ import {
   CompanySearchFilters,
 } from "@/src/types/email.types";
 import { ICompany, PaginatedResponse } from "@/src/types/admin.types";
-import api from "@/src/lib/Axios";
+import api from "@/src/lib/axios";
 
 // ─── Email Service ────────────────────────────────────────────────────────────
 
