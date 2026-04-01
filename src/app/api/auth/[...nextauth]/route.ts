@@ -89,7 +89,7 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user }): Promise<JWT> {
       if (user) {
         token.id = user.id;
-        token.role = user.role;
+        token.role = (user as any).role || "user";
         token.name = user.name;
         token.email = user.email;
       }

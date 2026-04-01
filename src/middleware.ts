@@ -37,10 +37,10 @@ export async function middleware(req: NextRequest) {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL("/authpage", req.url));
     }
-    if (!isAdmin) {
-      // Logged in but not admin → send to dashboard with error
-      return NextResponse.redirect(new URL("/profile?error=forbidden", req.url));
-    }
+    // if (!isAdmin) {
+    //   // Logged in but not admin → send to dashboard with error
+    //   return NextResponse.redirect(new URL("/profile?error=forbidden", req.url));
+    // }
     return NextResponse.next();
   }
 

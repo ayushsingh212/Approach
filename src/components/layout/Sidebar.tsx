@@ -8,12 +8,16 @@ import {
   LogOut,
   Shield,
 } from "lucide-react";
+import { useAuthStore } from "@/src/store/Authstore";
 import { useAuth } from "@/src/Hooks/Useauth";
 
-export default function Sidebar({ isAdmin = false }: any) {
+export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+  const { user } = useAuthStore();
+
+  const isAdmin = user?.role === "admin";
 
   const links = [
     { label: "Send Email", icon: Mail, path: "/" },
@@ -24,15 +28,12 @@ export default function Sidebar({ isAdmin = false }: any) {
 
   return (
     <div className="w-64 h-screen bg-gradient-to-b from-[#0f172a] to-[#020617] text-white p-5 flex flex-col justify-between shadow-2xl">
-
       <div>
-        {/* LOGO */}
         <div className="mb-10 flex items-center gap-3">
-          <img src="/logo.png" className="h-10" />
+          <img src="/logo.png" className="h-10" alt="Logo" />
           <span className="font-semibold text-lg">Approach</span>
         </div>
 
-        {/* LINKS */}
         <div className="space-y-2">
           {links.map((l) => {
             const active = pathname === l.path;
@@ -59,7 +60,6 @@ export default function Sidebar({ isAdmin = false }: any) {
         </div>
       </div>
 
-      {/* LOGOUT */}
       <button
         onClick={logout}
         className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/20 text-red-400"

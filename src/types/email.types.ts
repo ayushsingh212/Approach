@@ -71,3 +71,60 @@ export interface CompanySearchFilters {
   page?: number;
   limit?: number;
 }
+
+// src/types/email.types.ts
+
+export interface SendEmailPayload {
+  subject: string;
+  emailBody: string;
+  companyIds: string[];
+  attachments?: File[]; // ✅ NEW - Optional attachments
+}
+
+export interface SendEmailResponse {
+  success: boolean;
+  message: string;
+  sentCount?: number; // ✅ NEW - Number of emails sent
+  failedCount?: number; // Optional - Number of failed sends
+  data?: {
+    sentTo?: string[];
+    failedTo?: string[];
+  };
+}
+
+export interface SearchCompaniesPayload {
+  search?: string;
+  category?: string;
+  limit?: number;
+  page?: number;
+}
+
+export interface SearchCompaniesResponse {
+  data: Company[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
+}
+
+export interface Company {
+  _id: string;
+  name: string;
+  email: string;
+  category: string;
+  website?: string;
+  phone?: string;
+  address?: string;
+  createdAt?: string;
+}
+
+export interface EmailHistory {
+  _id: string;
+  subject: string;
+  body: string;
+  sentTo: Company[];
+  sentAt: string;
+  status: "sent" | "failed" | "pending";
+}
