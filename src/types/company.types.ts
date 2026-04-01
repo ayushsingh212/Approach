@@ -19,3 +19,5 @@ export type CompanyCategory =
   | "Manufacturing"
   | "Consulting"
   | "Other";
+
+  

@@ -10,9 +10,10 @@ export default function Dashboard() {
   const [appPassword, setAppPassword] = useState("");
   const [updating, setUpdating] = useState(false);
 
-  // ✅ Fetch user profile on mount
   useEffect(() => {
-    fetchProfile();
+    fetchProfile().catch((err) => {
+      console.error("Profile fetch failed:", err.message);
+    });
   }, [fetchProfile]);
 
   const handleUpdate = async () => {

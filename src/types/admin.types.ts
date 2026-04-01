@@ -1,4 +1,4 @@
-// ─── Company ──────────────────────────────────────────────────────────────────
+// ─── Company Category ─────────────────────────────────────────────────────────
 
 export type CompanyCategory =
   | "Technology"
@@ -29,11 +29,13 @@ export const COMPANY_CATEGORIES: CompanyCategory[] = [
   "Other",
 ];
 
+// ─── Company ──────────────────────────────────────────────────────────────────
+
 export interface ICompany {
   _id: string;
   name: string;
   email: string;
-  category: CompanyCategory;
+  category: CompanyCategory[];  // ✅ Array now!
   website?: string;
   description?: string;
   location?: string;
@@ -44,7 +46,7 @@ export interface ICompany {
   updatedAt: string;
 }
 
-// ─── Admin User view ──────────────────────────────────────────────────────────
+// ─── Admin User ───────────────────────────────────────────────────────────────
 
 export interface IAdminUser {
   _id: string;
@@ -75,20 +77,28 @@ export interface PaginatedResponse<T> {
 
 // ─── Company Payloads ─────────────────────────────────────────────────────────
 
+/**
+ * AddCompanyPayload - For creating new companies
+ * ✅ category is always an array (never empty string)
+ */
 export interface AddCompanyPayload {
   name: string;
   email: string;
-  category: CompanyCategory;
+  category: CompanyCategory[];  // ✅ Array of categories
   website?: string;
   description?: string;
   location?: string;
   tags?: string[];
 }
 
+/**
+ * UpdateCompanyPayload - For partial updates
+ * ✅ category is optional array
+ */
 export interface UpdateCompanyPayload {
   name?: string;
   email?: string;
-  category?: CompanyCategory;
+  category?: CompanyCategory[];  // ✅ Optional array
   website?: string;
   description?: string;
   location?: string;
@@ -96,11 +106,16 @@ export interface UpdateCompanyPayload {
   isActive?: boolean;
 }
 
-// ─── Filter shapes ────────────────────────────────────────────────────────────
+// ─── Filters ──────────────────────────────────────────────────────────────────
 
+/**
+ * CompanyFilters - For filtering companies list
+ * ✅ category is single string for filtering (filter by one category)
+ *    or empty string for no filter
+ */
 export interface CompanyFilters {
   search?: string;
-  category?: CompanyCategory | "";
+  category?: CompanyCategory | "";  // ✅ Single category for filtering
   active?: "true" | "false" | "";
   page?: number;
   limit?: number;

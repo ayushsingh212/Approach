@@ -9,103 +9,221 @@ import {
 } from "@/src/types/admin.types";
 import api from "@/src/lib/axios";
 
-// ─── Admin Service ────────────────────────────────────────────────────────────
-// All routes are protected at middleware level (admin role required).
+/**
+ * ✅ COMPLETE Admin Service
+ * 
+ * All admin API endpoints:
+ * - GET /api/admin/companies (list with filters)
+ * - POST /api/admin/companies (add)
+ * - GET /api/admin/companies/:id (single)
+ * - PUT /api/admin/companies/:id (update)
+ * - DELETE /api/admin/companies/:id (delete/soft-delete)
+ * - GET /api/admin/users (list)
+ * - PATCH /api/admin/users (update role)
+ * 
+ * ✅ Supports multiple categories per company
+ * ✅ Proper error propagation
+ * ✅ Type-safe payloads and responses
+ */
 
 export const adminService = {
-  // ── Companies ──────────────────────────────────────────────────────────────
+  // ═════════════════════════════════════════════════════════════════════════
+  // COMPANIES ENDPOINTS
+  // ═════════════════════════════════════════════════════════════════════════
 
   /**
    * GET /api/admin/companies
-   * Supports search, category, active flag, and pagination.
+   * Fetch list of companies with pagination and filters
+   * 
+   * @param filters - { page, limit, search, category, active }
+   * @returns Paginated list of companies with multiple categories
+   * 
+   * @example
+   * const result = await adminService.getCompanies({ 
+   *   page: 1, 
+   *   limit: 20,
+   *   category: "Technology"  // Single category for filtering
+   * });
    */
   getCompanies: async (
     filters?: CompanyFilters
   ): Promise<PaginatedResponse<ICompany>> => {
-    const { data } = await api.get<PaginatedResponse<ICompany>>(
-      "/admin/companies",
-      { params: filters }
-    );
-    return data;
-  },
-
-  /**
-   * GET /api/admin/companies/:id
-   * Fetches a single company with addedBy populated.
-   */
-  getCompanyById: async (id: string): Promise<ICompany> => {
-    const { data } = await api.get<{ company: ICompany }>(
-      `/admin/companies/${id}`
-    );
-    return data.company;
+    try {
+      const { data } = await api.get<PaginatedResponse<ICompany>>(
+        "/admin/companies",
+        { params: filters }
+      );
+      return data;
+    } catch (error: any) {
+      console.error("[adminService] getCompanies failed:", error.message);
+      throw error;
+    }
   },
 
   /**
    * POST /api/admin/companies
-   * Adds a new company. addedBy is resolved server-side from session.
+   * Create a new company with multiple categories
+   * 
+   * @param payload - { name, email, category: string[], website?, description?, location?, tags? }
+   * @returns Created company with array of categories
+   * 
+   * @example
+   * const company = await adminService.addCompany({
+   *   name: "Tech Corp",
+   *   email: "contact@techcorp.com",
+   *   category: ["Technology", "Finance"],  // ✅ Multiple categories
+   *   website: "https://techcorp.com"
+   * });
    */
   addCompany: async (payload: AddCompanyPayload): Promise<ICompany> => {
-    const { data } = await api.post<{ company: ICompany }>(
-      "/admin/companies",
-      payload
-    );
-    return data.company;
+    try {
+      const { data } = await api.post<{ company: ICompany; message: string }>(
+        "/admin/companies",
+        payload
+      );
+      return data.company;
+    } catch (error: any) {
+      console.error("[adminService] addCompany failed:", error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * GET /api/admin/companies/:id
+   * Fetch a single company with full details
+   * 
+   * @param id - Company ID
+   * @returns Single company with array of categories
+   */
+  getCompanyById: async (id: string): Promise<ICompany> => {
+    try {
+      const { data } = await api.get<{ company: ICompany }>(
+        `/admin/companies/${id}`
+      );
+      return data.company;
+    } catch (error: any) {
+      console.error("[adminService] getCompanyById failed:", error.message);
+      throw error;
+    }
   },
 
   /**
    * PUT /api/admin/companies/:id
-   * Updates allowed fields only (mass-assignment safe on server).
+   * Update company details including multiple categories
+   * 
+   * @param id - Company ID
+   * @param payload - Partial company data to update (all fields optional)
+   * @returns Updated company with array of categories
+   * 
+   * @example
+   * // Update categories
+   * const updated = await adminService.updateCompany(companyId, {
+   *   category: ["Technology", "Education"]  // ✅ Replace with new categories
+   * });
+   * 
+   * // Update other fields
+   * const updated = await adminService.updateCompany(companyId, {
+   *   name: "New Name",
+   *   website: "https://newurl.com",
+   *   isActive: false
+   * });
    */
   updateCompany: async (
     id: string,
     payload: UpdateCompanyPayload
   ): Promise<ICompany> => {
-    const { data } = await api.put<{ company: ICompany }>(
-      `/admin/companies/${id}`,
-      payload
-    );
-    return data.company;
+    try {
+      const { data } = await api.put<{ company: ICompany; message: string }>(
+        `/admin/companies/${id}`,
+        payload
+      );
+      return data.company;
+    } catch (error: any) {
+      console.error("[adminService] updateCompany failed:", error.message);
+      throw error;
+    }
   },
 
   /**
    * DELETE /api/admin/companies/:id
-   * Soft-deletes: sets isActive = false, does not remove the document.
+   * Soft-delete (deactivate) a company
+   * 
+   * @param id - Company ID
+   * @returns Deleted (deactivated) company
+   * 
+   * Note: This is a soft delete — sets isActive to false
+   * The company record remains in database
    */
   deleteCompany: async (id: string): Promise<ICompany> => {
-    const { data } = await api.delete<{ company: ICompany }>(
-      `/admin/companies/${id}`
-    );
-    return data.company;
+    try {
+      const { data } = await api.delete<{ company: ICompany; message: string }>(
+        `/admin/companies/${id}`
+      );
+      return data.company;
+    } catch (error: any) {
+      console.error("[adminService] deleteCompany failed:", error.message);
+      throw error;
+    }
   },
 
-  // ── Users ──────────────────────────────────────────────────────────────────
+  // ═════════════════════════════════════════════════════════════════════════
+  // USERS ENDPOINTS
+  // ═════════════════════════════════════════════════════════════════════════
 
   /**
    * GET /api/admin/users
-   * Returns paginated user list. Supports name/email search and role filter.
+   * Fetch list of users with pagination and filters
+   * 
+   * @param filters - { page, limit, search?, role? }
+   * @returns Paginated list of users
+   * 
+   * @example
+   * const result = await adminService.getUsers({
+   *   page: 1,
+   *   limit: 20,
+   *   role: "admin"  // Filter by role
+   * });
    */
   getUsers: async (
     filters?: UserFilters
   ): Promise<PaginatedResponse<IAdminUser>> => {
-    const { data } = await api.get<PaginatedResponse<IAdminUser>>(
-      "/admin/users",
-      { params: filters }
-    );
-    return data;
+    try {
+      const { data } = await api.get<PaginatedResponse<IAdminUser>>(
+        "/admin/users",
+        { params: filters }
+      );
+      return data;
+    } catch (error: any) {
+      console.error("[adminService] getUsers failed:", error.message);
+      throw error;
+    }
   },
 
   /**
    * PATCH /api/admin/users
-   * Toggles a user's role between "user" and "admin".
+   * Update a user's role (user ↔ admin)
+   * 
+   * @param userId - User ID
+   * @param role - New role ("user" or "admin")
+   * @returns Updated user
+   * 
+   * @example
+   * const user = await adminService.updateUserRole(userId, "admin");
+   * const user = await adminService.updateUserRole(userId, "user");
    */
   updateUserRole: async (
     userId: string,
     role: "user" | "admin"
   ): Promise<IAdminUser> => {
-    const { data } = await api.patch<{ user: IAdminUser }>(
-      "/admin/users",
-      { userId, role }
-    );
-    return data.user;
+    try {
+      const { data } = await api.patch<{ user: IAdminUser; message: string }>(
+        "/admin/users",
+        { userId, role }
+      );
+      return data.user;
+    } catch (error: any) {
+      console.error("[adminService] updateUserRole failed:", error.message);
+      throw error;
+    }
   },
 };

@@ -1,21 +1,44 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
 
+// ─── Keep categories here as the single source of truth ──────────────────────
+// Import into admin.types.ts from HERE, not the other way around,
+// to avoid circular imports (types importing from models)
+
+export const COMPANY_CATEGORIES = [
+  "Technology",
+  "Finance",
+  "Healthcare",
+  "Education",
+  "Marketing",
+  "E-Commerce",
+  "Logistics",
+  "Media",
+  "Real Estate",
+  "Manufacturing",
+  "Consulting",
+  "Other",
+] as const;
+
+export type CompanyCategory = (typeof COMPANY_CATEGORIES)[number];
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
 export interface ICompany extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
-  email: string;                   
-  category: string;                
+  email: string;
+  category: string[];           // ← array now
   website?: string;
   description?: string;
   location?: string;
-  addedBy: mongoose.Types.ObjectId; 
-  isActive: boolean;               
-  tags: string[];                
+  addedBy: mongoose.Types.ObjectId;
+  isActive: boolean;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-// ─── Schema ──────────────────────────────────────────────────────────────────
+// ─── Schema ───────────────────────────────────────────────────────────────────
 
 const CompanySchema = new Schema<ICompany>(
   {
@@ -36,30 +59,34 @@ const CompanySchema = new Schema<ICompany>(
       match: [/^\S+@\S+\.\S+$/, "Please enter a valid email address"],
     },
 
+    // ✅ Array field — enum doesn't work on [String] in Mongoose,
+    //    so we use a custom validator instead
     category: {
-      type: String,
-      required: [true, "Category is required"],
-      trim: true,
-      enum: [
-        "Technology",
-        "Finance",
-        "Healthcare",
-        "Education",
-        "Marketing",
-        "E-Commerce",
-        "Logistics",
-        "Media",
-        "Real Estate",
-        "Manufacturing",
-        "Consulting",
-        "Other",
+      type: [String],
+      default: [],
+      validate: [
+        {
+          // Must have at least one entry
+          validator: (arr: string[]) => Array.isArray(arr) && arr.length > 0,
+          message: "At least one category is required",
+        },
+        {
+          // Every entry must be a valid category
+          // [...COMPANY_CATEGORIES] spreads the readonly tuple into a plain string[]
+          validator: (arr: string[]) =>
+            arr.every((c) => ([...COMPANY_CATEGORIES] as string[]).includes(c)),
+          message: "One or more categories are not valid",
+        },
       ],
     },
 
     website: {
       type: String,
       trim: true,
-      match: [/^https?:\/\/.+/, "Please enter a valid URL (must start with http/https)"],
+      match: [
+        /^https?:\/\/.+/,
+        "Please enter a valid URL (must start with http/https)",
+      ],
     },
 
     description: {
@@ -82,7 +109,7 @@ const CompanySchema = new Schema<ICompany>(
 
     isActive: {
       type: Boolean,
-      default: true, // false = soft-deleted, hidden from users
+      default: true,
     },
 
     tags: {
@@ -90,9 +117,7 @@ const CompanySchema = new Schema<ICompany>(
       default: [],
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true },
 );
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────
@@ -101,22 +126,18 @@ CompanySchema.index({ email: 1 });
 CompanySchema.index({ category: 1 });
 CompanySchema.index({ isActive: 1 });
 CompanySchema.index({ createdAt: -1 });
-
-// Full-text search index on name, category, tags, location
 CompanySchema.index(
-  { name: "text", category: "text", tags: "text", location: "text" },
-  { name: "company_text_index" }
+  { name: "text", tags: "text", location: "text" },
+  { name: "company_text_index" },
 );
 
-// ─── Query Helpers ────────────────────────────────────────────────────────────
+// ─── Statics ──────────────────────────────────────────────────────────────────
 
-// Always filter out inactive companies in user-facing queries
-// Usage: Company.find().active()  ← call .active() to apply this
 CompanySchema.statics.findActive = function () {
   return this.find({ isActive: true });
 };
 
-// ─── Clean JSON output ────────────────────────────────────────────────────────
+// ─── JSON output ──────────────────────────────────────────────────────────────
 
 CompanySchema.set("toJSON", {
   transform: (_doc, ret: Record<string, any>) => {

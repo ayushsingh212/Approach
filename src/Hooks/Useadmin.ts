@@ -10,185 +10,271 @@ import {
   UserFilters,
 } from "@/src/types/admin.types";
 
+/**
+ * useAdmin Hook - Complete admin functionality
+ * 
+ * ✅ Properly stabilizes all state selections
+ * ✅ Proper error handling without rethrowing on silent failures
+ * ✅ Re-throws only for explicit user actions
+ * ✅ All dependencies are primitives or stable functions
+ */
 export function useAdmin() {
-  const store = useAdminStore();
 
-  // ── Fetch Companies ────────────────────────────────────────────────────────
-  const fetchCompanies = useCallback(async (filters?: CompanyFilters) => {
-    store.setCompaniesLoading(true);
-    store.setCompaniesError(null);
-    try {
-      console.log("📥 Fetching companies with filters:", filters);
-      const result = await adminService.getCompanies(
-        filters ?? store.companyFilters
-      );
-      console.log("✅ Companies fetched:", result.data.length);
-      store.setCompanies(result.data, result.pagination);
-      return result;
-    } catch (err: any) {
-      console.error("❌ Failed to fetch companies:", err);
-      const errorMessage = err?.response?.data?.error || err.message || "Failed to fetch companies";
-      store.setCompaniesError(errorMessage);
-      throw err;
-    } finally {
-      store.setCompaniesLoading(false);
-    }
-  }, [store]);
+  // ═════════════════════════════════════════════════════════════════════════
+  // SELECT EACH PIECE INDIVIDUALLY — Zustand stabilizes these references
+  // ❌ Never do: const store = useAdminStore() then use [store] as a dep
+  // ✅ Always do: select each value/action separately
+  // ═════════════════════════════════════════════════════════════════════════
 
-  // ── Add Company ────────────────────────────────────────────────────────────
-  const addCompany = useCallback(async (payload: AddCompanyPayload) => {
-    store.setCompaniesLoading(true);
-    store.setCompaniesError(null);
-    try {
-      console.log("➕ Adding company:", payload);
-      const company = await adminService.addCompany(payload);
-      console.log("✅ Company added:", company);
-      store.addCompanyToList(company);
-      return company;
-    } catch (err: any) {
-      console.error("❌ Failed to add company:", err);
-      const errorMessage = err?.response?.data?.error || err.message || "Failed to add company";
-      store.setCompaniesError(errorMessage);
-      throw err;
-    } finally {
-      store.setCompaniesLoading(false);
-    }
-  }, [store]);
+  // ── Company state ──────────────────────────────────────────────────────
+  const companies          = useAdminStore((s) => s.companies);
+  const companyPagination  = useAdminStore((s) => s.companyPagination);
+  const companyFilters     = useAdminStore((s) => s.companyFilters);
+  const companiesLoading   = useAdminStore((s) => s.companiesLoading);
+  const companiesError     = useAdminStore((s) => s.companiesError);
 
-  // ── Update Company ─────────────────────────────────────────────────────────
+  // ── Company actions ────────────────────────────────────────────────────
+  const setCompanies        = useAdminStore((s) => s.setCompanies);
+  const setCompaniesLoading = useAdminStore((s) => s.setCompaniesLoading);
+  const setCompaniesError   = useAdminStore((s) => s.setCompaniesError);
+  const setCompanyFilters   = useAdminStore((s) => s.setCompanyFilters);
+  const addCompanyToList    = useAdminStore((s) => s.addCompanyToList);
+  const updateCompanyInList = useAdminStore((s) => s.updateCompanyInList);
+
+  // ── User state ─────────────────────────────────────────────────────────
+  const users          = useAdminStore((s) => s.users);
+  const userPagination = useAdminStore((s) => s.userPagination);
+  const userFilters    = useAdminStore((s) => s.userFilters);
+  const usersLoading   = useAdminStore((s) => s.usersLoading);
+  const usersError     = useAdminStore((s) => s.usersError);
+
+  // ── User actions ───────────────────────────────────────────────────────
+  const setUsers          = useAdminStore((s) => s.setUsers);
+  const setUsersLoading   = useAdminStore((s) => s.setUsersLoading);
+  const setUsersError     = useAdminStore((s) => s.setUsersError);
+  const setUserFilters    = useAdminStore((s) => s.setUserFilters);
+  const updateUserInList  = useAdminStore((s) => s.updateUserInList);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // COMPANIES OPERATIONS
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * fetchCompanies - Fetch list of companies with pagination
+   * ✅ Does NOT re-throw — stores error in state
+   * ✅ Component should check companiesError state
+   */
+  const fetchCompanies = useCallback(
+    async (filters?: CompanyFilters) => {
+      setCompaniesLoading(true);
+      setCompaniesError(null);
+      try {
+        const result = await adminService.getCompanies(filters ?? companyFilters);
+        setCompanies(result.data, result.pagination);
+        return result;
+      } catch (err: any) {
+        const msg = err?.response?.data?.error || err?.message || "Failed to fetch companies";
+        setCompaniesError(msg);
+        // ✅ Don't re-throw — error is in state
+      } finally {
+        setCompaniesLoading(false);
+      }
+    },
+    [companyFilters, setCompanies, setCompaniesLoading, setCompaniesError]
+  );
+
+  /**
+   * getCompanyById - Fetch single company
+   * ✅ Re-throws because caller explicitly awaits
+   */
+  const getCompanyById = useCallback(
+    async (id: string) => {
+      try {
+        return await adminService.getCompanyById(id);
+      } catch (err: any) {
+        const msg = err?.response?.data?.error || err?.message || "Failed to fetch company";
+        setCompaniesError(msg);
+        throw err;
+      }
+    },
+    [setCompaniesError]
+  );
+
+  /**
+   * addCompany - Create new company
+   * ✅ Re-throws so form can show inline feedback
+   */
+  const addCompany = useCallback(
+    async (payload: AddCompanyPayload) => {
+      setCompaniesLoading(true);
+      setCompaniesError(null);
+      try {
+        const company = await adminService.addCompany(payload);
+        addCompanyToList(company);
+        return company;
+      } catch (err: any) {
+        const msg = err?.response?.data?.error || err?.message || "Failed to add company";
+        setCompaniesError(msg);
+        throw err; // ✅ Re-throw for form
+      } finally {
+        setCompaniesLoading(false);
+      }
+    },
+    [addCompanyToList, setCompaniesLoading, setCompaniesError]
+  );
+
+  /**
+   * updateCompany - Update company details
+   * ✅ Re-throws for explicit feedback
+   */
   const updateCompany = useCallback(
     async (id: string, payload: UpdateCompanyPayload) => {
-      store.setCompaniesError(null);
+      setCompaniesError(null);
       try {
-        console.log("✏️ Updating company:", id, payload);
         const updated = await adminService.updateCompany(id, payload);
-        console.log("✅ Company updated:", updated);
-        store.updateCompanyInList(id, updated);
+        updateCompanyInList(id, updated);
         return updated;
       } catch (err: any) {
-        console.error("❌ Failed to update company:", err);
-        const errorMessage = err?.response?.data?.error || err.message || "Failed to update company";
-        store.setCompaniesError(errorMessage);
+        const msg = err?.response?.data?.error || err?.message || "Failed to update company";
+        setCompaniesError(msg);
         throw err;
       }
     },
-    [store]
+    [updateCompanyInList, setCompaniesError]
   );
 
-  // ── Delete Company ─────────────────────────────────────────────────────────
-  const deleteCompany = useCallback(async (id: string) => {
-    store.setCompaniesError(null);
-    try {
-      console.log("🗑️ Deleting company:", id);
-      const result = await adminService.deleteCompany(id);
-      console.log("✅ Company deleted (soft-delete):", result);
-      // Update the company in list to show isActive = false
-      store.updateCompanyInList(id, { isActive: false });
-      return result;
-    } catch (err: any) {
-      console.error("❌ Failed to delete company:", err);
-      const errorMessage = err?.response?.data?.error || err.message || "Failed to delete company";
-      store.setCompaniesError(errorMessage);
-      throw err;
-    }
-  }, [store]);
+  /**
+   * deleteCompany - Soft-delete company
+   * ✅ Re-throws for explicit feedback
+   */
+  const deleteCompany = useCallback(
+    async (id: string) => {
+      setCompaniesError(null);
+      try {
+        const result = await adminService.deleteCompany(id);
+        updateCompanyInList(id, { isActive: false });
+        return result;
+      } catch (err: any) {
+        const msg = err?.response?.data?.error || err?.message || "Failed to delete company";
+        setCompaniesError(msg);
+        throw err;
+      }
+    },
+    [updateCompanyInList, setCompaniesError]
+  );
 
-  // ── Apply Filters ──────────────────────────────────────────────────────────
+  /**
+   * applyCompanyFilters - Apply filters and refetch
+   */
   const applyCompanyFilters = useCallback(
     async (filters: Partial<CompanyFilters>) => {
-      console.log("🔍 Applying filters:", filters);
-      store.setCompanyFilters(filters);
-      await fetchCompanies({ ...store.companyFilters, ...filters });
+      setCompanyFilters(filters);
+      await fetchCompanies({ ...companyFilters, ...filters });
     },
-    [store, fetchCompanies]
+    [companyFilters, setCompanyFilters, fetchCompanies]
   );
 
-  // ── Clear Error ────────────────────────────────────────────────────────────
+  /**
+   * clearCompaniesError - Clear error message
+   */
   const clearCompaniesError = useCallback(() => {
-    store.setCompaniesError(null);
-  }, [store]);
+    setCompaniesError(null);
+  }, [setCompaniesError]);
 
-  // ── Fetch Users ────────────────────────────────────────────────────────────
-  const fetchUsers = useCallback(async (filters?: UserFilters) => {
-    store.setUsersLoading(true);
-    store.setUsersError(null);
-    try {
-      console.log("📥 Fetching users with filters:", filters);
-      const result = await adminService.getUsers(
-        filters ?? store.userFilters
-      );
-      console.log("✅ Users fetched:", result.data.length);
-      store.setUsers(result.data, result.pagination);
-      return result;
-    } catch (err: any) {
-      console.error("❌ Failed to fetch users:", err);
-      const errorMessage = err?.response?.data?.error || err.message || "Failed to fetch users";
-      store.setUsersError(errorMessage);
-      throw err;
-    } finally {
-      store.setUsersLoading(false);
-    }
-  }, [store]);
+  // ═════════════════════════════════════════════════════════════════════════
+  // USERS OPERATIONS
+  // ═════════════════════════════════════════════════════════════════════════
 
-  // ── Update User Role ───────────────────────────────────────────────────────
+  /**
+   * fetchUsers - Fetch list of users with pagination
+   * ✅ Does NOT re-throw — stores error in state
+   */
+  const fetchUsers = useCallback(
+    async (filters?: UserFilters) => {
+      setUsersLoading(true);
+      setUsersError(null);
+      try {
+        const result = await adminService.getUsers(filters ?? userFilters);
+        setUsers(result.data, result.pagination);
+        return result;
+      } catch (err: any) {
+        const msg = err?.response?.data?.error || err?.message || "Failed to fetch users";
+        setUsersError(msg);
+        // ✅ Don't re-throw
+      } finally {
+        setUsersLoading(false);
+      }
+    },
+    [userFilters, setUsers, setUsersLoading, setUsersError]
+  );
+
+  /**
+   * updateUserRole - Change user's role
+   * ✅ Re-throws for explicit feedback
+   */
   const updateUserRole = useCallback(
     async (userId: string, role: "user" | "admin") => {
-      store.setUsersError(null);
+      setUsersError(null);
       try {
-        console.log("👤 Updating user role:", userId, role);
         const updated = await adminService.updateUserRole(userId, role);
-        console.log("✅ User role updated:", updated);
-        store.updateUserInList(userId, updated);
+        updateUserInList(userId, updated);
         return updated;
       } catch (err: any) {
-        console.error("❌ Failed to update user role:", err);
-        const errorMessage = err?.response?.data?.error || err.message || "Failed to update user role";
-        store.setUsersError(errorMessage);
+        const msg = err?.response?.data?.error || err?.message || "Failed to update user role";
+        setUsersError(msg);
         throw err;
       }
     },
-    [store]
+    [updateUserInList, setUsersError]
   );
 
-  // ── Apply User Filters ─────────────────────────────────────────────────────
+  /**
+   * applyUserFilters - Apply filters and refetch
+   */
   const applyUserFilters = useCallback(
     async (filters: Partial<UserFilters>) => {
-      console.log("🔍 Applying user filters:", filters);
-      store.setUserFilters(filters);
-      await fetchUsers({ ...store.userFilters, ...filters });
+      setUserFilters(filters);
+      await fetchUsers({ ...userFilters, ...filters });
     },
-    [store, fetchUsers]
+    [userFilters, setUserFilters, fetchUsers]
   );
 
-  // ── Clear User Error ───────────────────────────────────────────────────────
+  /**
+   * clearUsersError - Clear error message
+   */
   const clearUsersError = useCallback(() => {
-    store.setUsersError(null);
-  }, [store]);
+    setUsersError(null);
+  }, [setUsersError]);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // EXPOSED API
+  // ═════════════════════════════════════════════════════════════════════════
 
   return {
-    // ── Company state ──────────────────────────────────────────────────────
-    companies: store.companies,
-    companyPagination: store.companyPagination,
-    companyFilters: store.companyFilters,
-    companiesLoading: store.companiesLoading,
-    companiesError: store.companiesError,
+    // Company state
+    companies,
+    companyPagination,
+    companyFilters,
+    companiesLoading,
+    companiesError,
 
-    // ── Company actions ────────────────────────────────────────────────────
+    // Company actions
     fetchCompanies,
+    getCompanyById,
     addCompany,
     updateCompany,
     deleteCompany,
     applyCompanyFilters,
     clearCompaniesError,
 
-    // ── User state ─────────────────────────────────────────────────────────
-    users: store.users,
-    userPagination: store.userPagination,
-    userFilters: store.userFilters,
-    usersLoading: store.usersLoading,
-    usersError: store.usersError,
+    // User state
+    users,
+    userPagination,
+    userFilters,
+    usersLoading,
+    usersError,
 
-    // ── User actions ───────────────────────────────────────────────────────
+    // User actions
     fetchUsers,
     updateUserRole,
     applyUserFilters,
