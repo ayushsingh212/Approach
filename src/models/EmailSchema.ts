@@ -117,18 +117,23 @@ const EmailLogSchema = new Schema<IEmailLog>(
     totalSent: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
     totalFailed: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
-    // Computed overall status
+    // ✅ KEY FIX: status is required, but now gets set BEFORE create()
     status: {
       type: String,
-      enum: ["completed", "partial", "all_failed"],
-      required: true,
+      enum: {
+        values: ["completed", "partial", "all_failed"],
+        message: 'status must be one of: "completed", "partial", or "all_failed"',
+      },
+      required: [true, "Status is required"],
     },
 
     sentAt: {
@@ -147,13 +152,19 @@ EmailLogSchema.index({ sentBy: 1, sentAt: -1 }); // user's email history (most r
 EmailLogSchema.index({ sentAt: -1 });             // admin: all logs recent first
 EmailLogSchema.index({ status: 1 });              // filter by status
 
-// ─── Pre-save: Auto-compute totals and status ─────────────────────────────────
+// ─── Pre-save: Auto-compute totals and status (optional, as backup) ───────────
+// This runs AFTER creation if the document reaches save() without these fields.
+// But now the route.ts sets them explicitly before create(), so this is a safety net.
 
 EmailLogSchema.pre("save", async function () {
   if (this.deliveryResults && this.deliveryResults.length > 0) {
-    this.totalSent = this.deliveryResults.filter((r) => r.status === "sent").length;
-    this.totalFailed = this.deliveryResults.filter((r) => r.status === "failed").length;
- 
+    // Only recompute if not already set (allow route to override)
+    if (this.totalSent === 0 && this.totalFailed === 0) {
+      this.totalSent = this.deliveryResults.filter((r) => r.status === "sent").length;
+      this.totalFailed = this.deliveryResults.filter((r) => r.status === "failed").length;
+    }
+
+    // Recompute status based on current totals
     if (this.totalFailed === 0) {
       this.status = "completed";
     } else if (this.totalSent === 0) {

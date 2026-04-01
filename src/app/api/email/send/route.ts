@@ -18,17 +18,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 2. Parse body ─────────────────────────────────────────────────────────
-    const body = await req.json();
-    const { companyIds, subject, emailBody } = body as {
-      companyIds: string[];
-      subject: string;
-      emailBody: string;
-    };
+    const formData = await req.formData();
+    const subject = formData.get("subject") as string;
+    const emailBody = formData.get("emailBody") as string;
+    const companyIds = formData.getAll("companyIds") as string[];
 
     if (!companyIds?.length || !subject || !emailBody) {
       return NextResponse.json(
         { error: "companyIds, subject, and emailBody are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -37,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     // ── 4. Fetch user with sensitive fields ───────────────────────────────────
     const user = await User.findOne({ email: session.user.email }).select(
-      "+googleAppPassword +password"
+      "+googleAppPassword +password",
     );
 
     if (!user) {
@@ -47,7 +45,7 @@ export async function POST(req: NextRequest) {
     if (!user.googleAppPassword || !user.senderEmail) {
       return NextResponse.json(
         { error: "Sender email or Google App Password not configured" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -57,8 +55,10 @@ export async function POST(req: NextRequest) {
       appPassword = decrypt(user.googleAppPassword);
     } catch {
       return NextResponse.json(
-        { error: "Failed to decrypt credentials. Please re-save your settings." },
-        { status: 500 }
+        {
+          error: "Failed to decrypt credentials. Please re-save your settings.",
+        },
+        { status: 500 },
       );
     }
 
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     if (!companies.length) {
       return NextResponse.json(
         { error: "No active companies found for the given IDs" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
           error:
             "Gmail authentication failed. Check your sender email and Google App Password.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -105,8 +105,8 @@ export async function POST(req: NextRequest) {
           to: company.email,
           subject: subject,
           html: emailBody,
-        })
-      )
+        }),
+      ),
     );
 
     // ── 10. Build delivery results ────────────────────────────────────────────
@@ -134,7 +134,23 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // ── 11. Save email log ────────────────────────────────────────────────────
+    // ── 11. Compute totals and status ─────────────────────────────────────────
+    const totalSent = deliveryResults.filter((r) => r.status === "sent").length;
+    const totalFailed = deliveryResults.filter(
+      (r) => r.status === "failed",
+    ).length;
+
+    // Determine overall status BEFORE saving
+    let computedStatus: "completed" | "partial" | "all_failed";
+    if (totalFailed === 0) {
+      computedStatus = "completed";
+    } else if (totalSent === 0) {
+      computedStatus = "all_failed";
+    } else {
+      computedStatus = "partial";
+    }
+
+    // ── 12. Save email log with all required fields ───────────────────────────
     const emailLog = await EmailLog.create({
       sentBy: user._id,
       senderEmail: user.senderEmail,
@@ -143,16 +159,18 @@ export async function POST(req: NextRequest) {
       companies: companies.map((c) => c._id),
       deliveryResults,
       totalTargeted: companies.length,
-      // totalSent, totalFailed, status are auto-computed in pre-save hook
+      totalSent, // ✅ EXPLICITLY SET
+      totalFailed, // ✅ EXPLICITLY SET
+      status: computedStatus, // ✅ EXPLICITLY SET - This is the key fix!
+      sentAt: new Date(),
     });
 
-    // ── 12. Increment user's email sent count ─────────────────────────────────
-    const sentCount = deliveryResults.filter((r) => r.status === "sent").length;
+    // ── 13. Increment user's email sent count ─────────────────────────────────
     await User.findByIdAndUpdate(user._id, {
-      $inc: { emailsSentCount: sentCount },
+      $inc: { emailsSentCount: totalSent },
     });
 
-    // ── 13. Return result ─────────────────────────────────────────────────────
+    // ── 14. Return result ─────────────────────────────────────────────────────
     return NextResponse.json({
       success: true,
       summary: {
@@ -163,12 +181,11 @@ export async function POST(req: NextRequest) {
       },
       deliveryResults,
     });
-
   } catch (error) {
     console.error("[EMAIL SEND ERROR]", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

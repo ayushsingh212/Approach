@@ -11,11 +11,25 @@ import api from "@/src/lib/axios";
 export const emailService = {
   /**
    * POST /api/email/send
-   * Sends emails to target companies using the user's Gmail + App Password.
-   * Decrypts credentials server-side, verifies SMTP, then sends in parallel.
+   * ✅ NEW: Sends emails with attachments using FormData
+   * FormData allows multipart/form-data for file upload
+   */
+  sendEmailWithAttachments: async (formData: FormData) => {
+    const { data } = await api.post("/email/send-with-supabase", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  },
+
+  /**
+   * POST /api/email/send
+   * Original method - for backward compatibility (without attachments)
    */
   sendEmail: async (payload: SendEmailPayload): Promise<SendEmailResponse> => {
-    const { data } = await api.post<SendEmailResponse>("/email/send", payload);
+    const { data } = await api.post<SendEmailResponse>(
+      "/email/send",
+      payload,
+    );
     return data;
   },
 
@@ -25,12 +39,11 @@ export const emailService = {
    * Uses MongoDB full-text index on name, category, tags, location.
    */
   searchCompanies: async (
-    filters?: CompanySearchFilters
+    filters?: CompanySearchFilters,
   ): Promise<PaginatedResponse<ICompany>> => {
-    const { data } = await api.get<PaginatedResponse<ICompany>>(
-      "/companies",
-      { params: filters }
-    );
+    const { data } = await api.get<PaginatedResponse<ICompany>>("/companies", {
+      params: filters,
+    });
     return data;
   },
 };
