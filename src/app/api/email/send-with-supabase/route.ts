@@ -166,6 +166,7 @@ export async function POST(req: NextRequest) {
       totalSent,
       totalFailed,
       status,
+      attachmentUrls,
       sentAt: new Date(),
     });
 

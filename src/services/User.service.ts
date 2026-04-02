@@ -21,11 +21,11 @@ export const userService = {
    * Verifies Gmail credentials against SMTP before saving.
    */
   updateCredentials: async (
-    payload: UpdateCredentialsPayload
+    payload: UpdateCredentialsPayload,
   ): Promise<{ message: string; user: IUser }> => {
     const { data } = await api.put<{ message: string; user: IUser }>(
       "/user/credentials",
-      payload
+      payload,
     );
     return data;
   },
@@ -35,12 +35,19 @@ export const userService = {
    * Returns paginated email logs for the current user.
    */
   getSentEmails: async (
-    filters?: EmailLogFilters
+    filters?: EmailLogFilters,
   ): Promise<PaginatedResponse<IEmailLog>> => {
     const { data } = await api.get<PaginatedResponse<IEmailLog>>(
       "/user/sentEmails",
-      { params: filters }
+      { params: filters },
     );
     return data;
+  },
+
+  getSentEmailById: async (id: string): Promise<IEmailLog> => {
+    const { data } = await api.get<{ data: IEmailLog }>(
+      `/user/sentEmails/${id}`,
+    );
+    return data.data;
   },
 };

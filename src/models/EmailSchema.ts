@@ -4,26 +4,32 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 
 export interface IDeliveryResult {
   company: mongoose.Types.ObjectId;
-  companyEmail: string;           // snapshot at time of send (email might change later)
-  companyName: string;            // snapshot
+  companyEmail: string; // snapshot at time of send (email might change later)
+  companyName: string; // snapshot
   status: "sent" | "failed";
-  errorMessage?: string;          // populated only if status === "failed"
-  messageId?: string;             // Nodemailer messageId on success
+  errorMessage?: string; // populated only if status === "failed"
+  messageId?: string; // Nodemailer messageId on success
 }
 
 // ─── TypeScript Interface ────────────────────────────────────────────────────
 
+export interface IAttachmentUrl {
+  filename: string;
+  url: string;
+}
+
 export interface IEmailLog extends Document {
   _id: mongoose.Types.ObjectId;
-  sentBy: mongoose.Types.ObjectId;          // ref: User
-  senderEmail: string;                      // snapshot of user.senderEmail at send time
+  sentBy: mongoose.Types.ObjectId; // ref: User
+  senderEmail: string; // snapshot of user.senderEmail at send time
   subject: string;
-  body: string;                             // HTML body
-  companies: mongoose.Types.ObjectId[];     // all companies targeted
-  deliveryResults: IDeliveryResult[];       // per-company status
+  body: string; // HTML body
+  companies: mongoose.Types.ObjectId[]; // all companies targeted
+  deliveryResults: IDeliveryResult[]; // per-company status
   totalTargeted: number;
   totalSent: number;
   totalFailed: number;
+  attachmentUrls: IAttachmentUrl[];
   status: "completed" | "partial" | "all_failed";
   sentAt: Date;
   createdAt: Date;
@@ -66,7 +72,7 @@ const DeliveryResultSchema = new Schema<IDeliveryResult>(
       default: null,
     },
   },
-  { _id: false } // No separate _id for sub-documents
+  { _id: false }, // No separate _id for sub-documents
 );
 
 // ─── Main Schema ──────────────────────────────────────────────────────────────
@@ -120,6 +126,13 @@ const EmailLogSchema = new Schema<IEmailLog>(
       min: 0,
     },
 
+    attachmentUrls: [
+      {
+        filename: { type: String, required: true },
+        url: { type: String, required: true },
+      },
+    ],
+
     totalFailed: {
       type: Number,
       default: 0,
@@ -131,7 +144,8 @@ const EmailLogSchema = new Schema<IEmailLog>(
       type: String,
       enum: {
         values: ["completed", "partial", "all_failed"],
-        message: 'status must be one of: "completed", "partial", or "all_failed"',
+        message:
+          'status must be one of: "completed", "partial", or "all_failed"',
       },
       required: [true, "Status is required"],
     },
@@ -143,14 +157,14 @@ const EmailLogSchema = new Schema<IEmailLog>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────
 
 EmailLogSchema.index({ sentBy: 1, sentAt: -1 }); // user's email history (most recent first)
-EmailLogSchema.index({ sentAt: -1 });             // admin: all logs recent first
-EmailLogSchema.index({ status: 1 });              // filter by status
+EmailLogSchema.index({ sentAt: -1 }); // admin: all logs recent first
+EmailLogSchema.index({ status: 1 }); // filter by status
 
 // ─── Pre-save: Auto-compute totals and status (optional, as backup) ───────────
 // This runs AFTER creation if the document reaches save() without these fields.
@@ -160,8 +174,12 @@ EmailLogSchema.pre("save", async function () {
   if (this.deliveryResults && this.deliveryResults.length > 0) {
     // Only recompute if not already set (allow route to override)
     if (this.totalSent === 0 && this.totalFailed === 0) {
-      this.totalSent = this.deliveryResults.filter((r) => r.status === "sent").length;
-      this.totalFailed = this.deliveryResults.filter((r) => r.status === "failed").length;
+      this.totalSent = this.deliveryResults.filter(
+        (r) => r.status === "sent",
+      ).length;
+      this.totalFailed = this.deliveryResults.filter(
+        (r) => r.status === "failed",
+      ).length;
     }
 
     // Recompute status based on current totals

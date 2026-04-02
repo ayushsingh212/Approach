@@ -128,3 +128,31 @@ export interface EmailHistory {
   sentAt: string;
   status: "sent" | "failed" | "pending";
 }
+
+export interface IAttachmentUrl {
+  filename: string;
+  url: string;
+}
+
+export interface IEmailLog {
+  _id: string;
+  sentBy: string;
+  senderEmail: string;
+  subject: string;
+  body: string;
+  companies: Array<{
+    _id: string;
+    name: string;
+    email: string;
+    category: string;
+  }> | string[];
+  deliveryResults: IDeliveryResult[];
+  totalTargeted: number;
+  totalSent: number;
+  totalFailed: number;
+  status: "completed" | "partial" | "all_failed";
+  attachmentUrls: IAttachmentUrl[]; // ✅ add this
+  sentAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
