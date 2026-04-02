@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/src/lib/db";
 import Company from "@/src/models/CompanySchema";
 import mongoose from "mongoose";
+import { z } from "zod";
+import { rateLimiter, rateLimitResponse } from "@/src/lib/rateLimiter";
+import { CompanySchemaValidation } from "@/src/lib/validations";
 
 type Params = { params: { id: string } };
 
@@ -41,19 +44,33 @@ export async function PUT(req: NextRequest, { params }: Params) {
   try {
     await connectDB();
 
-    const body = await req.json();
-    const allowedFields = [
-      "name", "email", "category", "website",
-      "description", "location", "tags", "isActive",
-    ];
+    // ── 1. Rate Limiting ──────────────────────────────────────────────────────
+    const ip = req.headers.get("x-forwarded-for") || "anonymous";
+    const { success, retryAfter } = rateLimiter(`admin-company-put-${ip}`, {
+      limit: 30,         // 30 updates
+      windowMs: 60000,   // per minute
+    });
 
-    // Only pick allowed fields to prevent mass assignment
-    const updateData: Record<string, any> = {};
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
-      }
+    if (!success) {
+      return rateLimitResponse(retryAfter);
     }
+
+    // ── 2. Parse and Validate ─────────────────────────────────────────────────
+    const body = await req.json();
+    const updateSchema = CompanySchemaValidation.partial().extend({
+      isActive: z.boolean().optional(),
+    });
+
+    const result = updateSchema.safeParse(body);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error.issues[0].message },
+        { status: 400 }
+      );
+    }
+
+    const updateData = result.data;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });

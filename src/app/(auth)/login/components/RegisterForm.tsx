@@ -9,6 +9,7 @@ import {
 import toast from "react-hot-toast";
 import { useAuth } from "@/src/Hooks/Useauth";
 import { RegisterPayload } from "@/src/types/user.types";
+import { stripEmojis } from "@/src/utils/sanitization";
 
 export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void }) {
   const router = useRouter();
@@ -26,8 +27,12 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
     googleAppPassword: "",
   });
 
-  const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    if (field === "name") val = stripEmojis(val);
+    if (field === "googleAppPassword") val = val.replace(/\s/g, "");
+    setForm((prev) => ({ ...prev, [field]: val }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +101,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
         </label>
         <input
           type="text"
+          maxLength={50}
           value={form.name}
           onChange={set("name")}
           disabled={isLoading}
@@ -112,6 +118,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
         </label>
         <input
           type="email"
+          maxLength={100}
           value={form.email}
           onChange={set("email")}
           disabled={isLoading}
@@ -130,6 +137,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
           <div className="relative">
             <input
               type={showPass ? "text" : "password"}
+              maxLength={128}
               value={form.password}
               onChange={set("password")}
               disabled={isLoading}
@@ -153,6 +161,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
           </label>
           <input
             type="password"
+            maxLength={128}
             value={form.confirmPassword}
             onChange={set("confirmPassword")}
             disabled={isLoading}
@@ -173,6 +182,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
         </label>
         <input
           type="email"
+          maxLength={100}
           value={form.senderEmail}
           onChange={set("senderEmail")}
           disabled={isLoading}
@@ -198,6 +208,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
         <div className="relative">
           <input
             type={showAppPass ? "text" : "password"}
+            maxLength={16}
             value={form.googleAppPassword}
             onChange={set("googleAppPassword")}
             disabled={isLoading}

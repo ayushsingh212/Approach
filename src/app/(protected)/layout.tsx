@@ -4,7 +4,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
-import Sidebar from "@/src/components/layout/Sidebar";
+import dynamic from "next/dynamic";
+
+const Sidebar = dynamic(() => import("@/src/components/layout/Sidebar"), {
+  ssr: false,
+  loading: () => <div className="hidden lg:block w-64 bg-[#0f172a] animate-pulse" />,
+});
 
 export default function ProtectedLayout({
   children,

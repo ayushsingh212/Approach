@@ -37,10 +37,10 @@ export async function middleware(req: NextRequest) {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL("/authpage", req.url));
     }
-    // if (!isAdmin) {
-    //   // Logged in but not admin → send to dashboard with error
-    //   return NextResponse.redirect(new URL("/profile?error=forbidden", req.url));
-    // }
+    if (!isAdmin) {
+      // Logged in but not admin → send to dashboard with error
+      return NextResponse.redirect(new URL("/profile?error=forbidden", req.url));
+    }
     return NextResponse.next();
   }
 
@@ -76,7 +76,23 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  return NextResponse.next();
+  // ── 5. Standard Security Headers ──────────────────────────────────────────
+  const response = NextResponse.next();
+  
+  // Prevent MIME type sniffing
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  // Prevent site being framed (Clickjacking) - set to 'DENY' or 'SAMEORIGIN'
+  response.headers.set("X-Frame-Options", "DENY");
+  // Enable browser XSS protection
+  response.headers.set("X-XSS-Protection", "1; mode=block");
+  // Strict Referrer Policy
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // HSTS (Strict-Transport-Security) - only if HTTPS
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  }
+
+  return response;
 }
 
 // ─── Matcher: which paths this middleware runs on ─────────────────────────────

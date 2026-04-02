@@ -4,6 +4,7 @@ import { authOptions } from "@/src/app/api/auth/[...nextauth]/route";
 import { connectDB } from "@/src/lib/db";
 import Company from "@/src/models/CompanySchema";
 import UserModel from "@/src/models/UserSchema";
+import { CompanySchemaValidation } from "@/src/lib/validations";
 
 // ── GET all companies (admin sees inactive too) ───────────────────────────────
 
@@ -54,17 +55,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const {
-      name, email, category,
-      website, description, location, tags,
-    } = await req.json();
+    const body = await req.json();
+    const result = CompanySchemaValidation.safeParse(body);
 
-    if (!name || !email || !category) {
+    if (!result.success) {
       return NextResponse.json(
-        { error: "name, email, and category are required" },
+        { error: result.error.issues[0].message },
         { status: 400 }
       );
     }
+
+    const {
+      name, email, category,
+      website, description, location, tags,
+    } = result.data;
 
     await connectDB();
 

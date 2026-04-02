@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/src/lib/db";
 import UserModel from "@/src/models/UserSchema";
+import { z } from "zod";
+import { rateLimiter, rateLimitResponse } from "@/src/lib/rateLimiter";
 
 export async function GET(req: NextRequest) {
   try {
@@ -58,15 +60,33 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     await connectDB();
+    const ip = req.headers.get("x-forwarded-for") || "anonymous";
+    const { success, retryAfter } = rateLimiter(`admin-user-patch-${ip}`, {
+      limit: 20,         // 20 updates
+      windowMs: 60000,   // per minute
+    });
 
-    const { userId, role } = await req.json();
+    if (!success) {
+      return rateLimitResponse(retryAfter);
+    }
 
-    if (!userId || !["user", "admin"].includes(role)) {
+    // ── 2. Parse and Validate ─────────────────────────────────────────────────
+    const body = await req.json();
+    const updateSchema = z.object({
+      userId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid User ID format"),
+      role: z.enum(["user", "admin"]),
+    });
+
+    const result = updateSchema.safeParse(body);
+
+    if (!result.success) {
       return NextResponse.json(
-        { error: "userId and role ('user' | 'admin') are required" },
+        { error: result.error.issues[0].message },
         { status: 400 }
       );
     }
+
+    const { userId, role } = result.data;
 
     const updated = await UserModel.findByIdAndUpdate(
       userId,

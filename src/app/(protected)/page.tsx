@@ -7,6 +7,10 @@ import { useEmailStore } from "@/src/store/Emailstore";
 import { emailService } from "@/src/services/Email.service";
 import { Search, X, Paperclip, AlertCircle, CheckCircle, Send } from "lucide-react";
 import toast from "react-hot-toast";
+import { useDebounce } from "@/src/Hooks/useDebounce";
+import { useThrottle } from "@/src/Hooks/useThrottle";
+import { stripEmojis } from "@/src/utils/sanitization";
+import { SkeletonCard } from "@/src/components/ui/Skeleton";
 
 const categories = [
   "Technology", "Finance", "Healthcare", "Education", "Marketing",
@@ -25,6 +29,7 @@ export default function HomePage() {
   const { companySearchResults, selectedCompanies, subject, emailBody, isSending, sendResult, sendError } = store;
 
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 500); // 500ms debounce
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
@@ -55,8 +60,8 @@ export default function HomePage() {
       setIsSearchLoading(true);
       try {
         const res = await emailService.searchCompanies({
-          search: search || undefined,
-          category: selectedCategories.length > 0 ? selectedCategories[0] : undefined,
+          search: debouncedSearch || undefined,
+          category: selectedCategories.length > 0 ? selectedCategories.join(",") : undefined,
         });
         store.setCompanySearchResults(res.data, res.pagination);
       } catch {
@@ -65,10 +70,9 @@ export default function HomePage() {
         setIsSearchLoading(false);
       }
     };
-    const timer = setTimeout(fetchCompanies, 300);
-    return () => clearTimeout(timer);
+    fetchCompanies();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, selectedCategories]);
+  }, [debouncedSearch, selectedCategories]);
 
   useEffect(() => {
     if (!sendError && !sendResult) return;
@@ -79,7 +83,7 @@ export default function HomePage() {
 
   const clearState = () => { store.setSendError(null); store.setSendResult(null); };
 
-  const handleSend = async () => {
+  const handleSend = useThrottle(async () => {
     if (!subject.trim()) { toast.error("Please enter an email subject"); return; }
     if (!emailBody.trim()) { toast.error("Please write an email body"); return; }
     if (selectedCompanies.length === 0) { toast.error("Please select at least one company"); return; }
@@ -107,10 +111,10 @@ export default function HomePage() {
     } finally {
       store.setIsSending(false);
     }
-  };
+  }, 2000);
 
   const toggleCategory = (cat: string) =>
-    setSelectedCategories((prev) => prev.includes(cat) ? prev.filter((c) => c !== cat) : [cat]);
+    setSelectedCategories((prev) => prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]);
 
   const handleAttachClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault(); e.stopPropagation();
@@ -211,8 +215,10 @@ export default function HomePage() {
           {/* Company list */}
           <div className="space-y-2">
             {isSearchLoading ? (
-              <div className="flex justify-center py-10">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500" />
+              <div className="space-y-2">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
               </div>
             ) : companySearchResults.length === 0 ? (
               <div className="text-center py-10 text-slate-400 text-sm">No companies found.</div>
@@ -332,8 +338,9 @@ export default function HomePage() {
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Subject</label>
             <input
               placeholder="e.g., Partnership Opportunity"
+              maxLength={150}
               value={subject}
-              onChange={(e) => store.setSubject(e.target.value)}
+              onChange={(e) => store.setSubject(stripEmojis(e.target.value))}
               className="w-full px-4 py-3 text-sm rounded-xl border border-slate-200 bg-white
                 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
             />
@@ -344,8 +351,9 @@ export default function HomePage() {
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Body</label>
             <textarea
               placeholder="Write your message here... (HTML supported)"
+              maxLength={10000}
               value={emailBody}
-              onChange={(e) => store.setEmailBody(e.target.value)}
+              onChange={(e) => store.setEmailBody(stripEmojis(e.target.value))}
               className="flex-1 min-h-[180px] lg:min-h-0 p-4 text-sm border border-slate-200 rounded-xl
                 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
             />

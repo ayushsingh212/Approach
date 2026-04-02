@@ -3,43 +3,38 @@ import { connectDB } from "@/src/lib/db";
 import UserModel from "@/src/models/UserSchema";
 import { encrypt } from "@/src/lib/encrypt";
 import { verifyGmailCredentials } from "@/src/lib/verifyGmailCredentials";
+import { rateLimiter, rateLimitResponse } from "@/src/lib/rateLimiter";
+import { RegisterSchema } from "@/src/lib/validations";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, senderEmail, googleAppPassword } =
-      await req.json();
 
-    // ── Validate required fields ──────────────────────────────────────────────
-    if (!name || !email || !password || !senderEmail || !googleAppPassword) {
+    // ── 1. Rate Limiting ──────────────────────────────────────────────────────
+    const ip = req.headers.get("x-forwarded-for") || "anonymous";
+    const { success, retryAfter } = rateLimiter(`register-${ip}`, {
+      limit: 5,         // Max 5 attempts
+      windowMs: 600000, // per 10 minutes
+    });
+
+    if (!success) {
+      return rateLimitResponse(retryAfter);
+    }
+
+    // ── 2. Parse and Validate Body ────────────────────────────────────────────
+    const body = await req.json();
+    const result = RegisterSchema.safeParse(body);
+
+    if (!result.success) {
       return NextResponse.json(
-        { error: "All fields are required: name, email, password, senderEmail, googleAppPassword" },
+        { error: result.error.issues[0].message },
         { status: 400 }
       );
     }
 
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
-        { status: 400 }
-      );
-    }
+    const { name, email, password, senderEmail, googleAppPassword } = result.data;
 
-    if (!senderEmail.endsWith("@gmail.com")) {
-      return NextResponse.json(
-        { error: "Sender email must be a Gmail address" },
-        { status: 400 }
-      );
-    }
-
-    // Google App Password is always 16 chars (no spaces)
+    // ── 3. Gmail Credential Verification ──────────────────────────────────────
     const cleanAppPassword = googleAppPassword.replace(/\s/g, "");
-    if (cleanAppPassword.length !== 16) {
-      return NextResponse.json(
-        { error: "Google App Password must be exactly 16 characters" },
-        { status: 400 }
-      );
-    }
-
     const gmailCheck = await verifyGmailCredentials(senderEmail, cleanAppPassword);
     if (!gmailCheck.valid) {
       return NextResponse.json({ error: gmailCheck.error }, { status: 400 });

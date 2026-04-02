@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useAdmin } from "@/src/Hooks/Useadmin";
 import { AddCompanyPayload, CompanyCategory, COMPANY_CATEGORIES } from "@/src/types/admin.types";
 import { Plus, X, Building2, Users, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useDebounce } from "@/src/Hooks/useDebounce";
+import { stripEmojis } from "@/src/utils/sanitization";
+import { SkeletonCard, SkeletonRow } from "@/src/components/ui/Skeleton";
 
 export default function AdminPanel() {
   const {
@@ -15,6 +18,10 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<"companies" | "users">("companies");
   const [showAddForm, setShowAddForm] = useState(false);
   const [searchCompany, setSearchCompany] = useState("");
+  const debouncedSearchCompany = useDebounce(searchCompany, 500);
+  const [searchUser, setSearchUser] = useState("");
+  const debouncedSearchUser = useDebounce(searchUser, 500);
+
   const [filterCategory, setFilterCategory] = useState<CompanyCategory | "">("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<AddCompanyPayload>({
@@ -24,14 +31,19 @@ export default function AdminPanel() {
   const hasFetchedRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (activeTab === "companies" && !hasFetchedRef.current.companies) {
-      hasFetchedRef.current.companies = true;
-      fetchCompanies();
-    } else if (activeTab === "users" && !hasFetchedRef.current.users) {
-      hasFetchedRef.current.users = true;
-      fetchUsers();
-    }
-  }, [activeTab, fetchCompanies, fetchUsers]);
+    fetchCompanies({
+      search: debouncedSearchCompany || undefined,
+      category: filterCategory || undefined,
+      page: 1,
+    });
+  }, [debouncedSearchCompany, filterCategory, fetchCompanies]);
+
+  useEffect(() => {
+    fetchUsers({
+      search: debouncedSearchUser || undefined,
+      page: 1,
+    });
+  }, [debouncedSearchUser, fetchUsers]);
 
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +133,7 @@ export default function AdminPanel() {
                       <input
                         type="text"
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, name: stripEmojis(e.target.value) })}
                         placeholder="Acme Corp"
                         className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
                           focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -134,7 +146,7 @@ export default function AdminPanel() {
                       <input
                         type="email"
                         value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase().trim() })}
                         placeholder="contact@company.com"
                         className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
                           focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -176,9 +188,9 @@ export default function AdminPanel() {
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Location</label>
                       <input
-                        type="text"
+                        maxLength={100}
                         value={formData.location}
-                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, location: stripEmojis(e.target.value) })}
                         placeholder="New Delhi, India"
                         className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
                           focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -190,8 +202,9 @@ export default function AdminPanel() {
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Description</label>
                     <textarea
                       value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, description: stripEmojis(e.target.value) })}
                       placeholder="Brief description..."
+                      maxLength={500}
                       rows={3}
                       className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
                         focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
@@ -252,8 +265,10 @@ export default function AdminPanel() {
 
             {/* Companies list */}
             {companiesLoading ? (
-              <div className="flex justify-center py-16">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
+              <div className="grid gap-3">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
               </div>
             ) : companies.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border-2 border-dashed border-slate-200">
@@ -353,8 +368,11 @@ export default function AdminPanel() {
             )}
 
             {usersLoading ? (
-              <div className="flex justify-center py-16">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
+              <div className="grid gap-3">
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
               </div>
             ) : users.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border-2 border-dashed border-slate-200">

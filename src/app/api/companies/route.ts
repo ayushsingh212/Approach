@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/src/lib/db";
 import Company from "@/src/models/CompanySchema";
+import { rateLimiter, rateLimitResponse } from "@/src/lib/rateLimiter";
 
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
+
+    // ── 1. Rate Limiting ──────────────────────────────────────────────────────
+    const ip = req.headers.get("x-forwarded-for") || "anonymous";
+    const { success, retryAfter } = rateLimiter(`search-companies-${ip}`, {
+      limit: 30,        // 30 requests
+      windowMs: 60000,  // per minute
+    });
+
+    if (!success) {
+      return rateLimitResponse(retryAfter);
+    }
 
     const { searchParams } = new URL(req.url);
     const search   = searchParams.get("search")?.trim() ?? "";
@@ -13,7 +25,7 @@ export async function GET(req: NextRequest) {
     const limit    = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") ?? "20")));
     const skip     = (page - 1) * limit;
 
-    // ── Build filter ──────────────────────────────────────────────────────────
+    // ── 2. Build filter ──────────────────────────────────────────────────────────
     const filter: Record<string, any> = { isActive: true };
 
     if (search) {
@@ -22,7 +34,10 @@ export async function GET(req: NextRequest) {
     }
 
     if (category) {
-      filter.category = category;
+      const categories = category.split(",").filter(Boolean);
+      if (categories.length > 0) {
+        filter.category = { $in: categories };
+      }
     }
 
     // ── Query ─────────────────────────────────────────────────────────────────

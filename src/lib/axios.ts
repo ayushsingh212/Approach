@@ -48,7 +48,22 @@ api.interceptors.response.use(
     return response;
   },
 
-  (error: AxiosError<{ error?: string; message?: string }>) => {
+  async (error: AxiosError<{ error?: string; message?: string }>) => {
+    const config = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // Retry logic for GET requests only (idempotent)
+    if (
+      config &&
+      config.method?.toUpperCase() === "GET" &&
+      !config._retry && 
+      (error.code === "ECONNABORTED" || error.response?.status === 429)
+    ) {
+      config._retry = true;
+      const delay = error.response?.status === 429 ? 2000 : 1000;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return api(config);
+    }
+
     // Safely parse request data for logging
     let payloadLog = undefined;
     try {
@@ -67,38 +82,26 @@ api.interceptors.response.use(
       errorMessage: error.message,
     });
 
-    // Network / timeout — no response from server
     if (!error.response) {
-      return Promise.reject(new Error("Network error – please check your connection."));
+      return Promise.reject(new Error("Network connection lost. Please verify your internet."));
     }
 
     const { status, data } = error.response;
+    const message = data?.error ?? data?.message ?? error.message;
 
-    // Extract a human-readable message from the API response body
-    const message =
-      data?.error ??
-      data?.message ??
-      error.message ??
-      "An unexpected error occurred.";
-
-    // Map common HTTP status codes to friendlier messages
     const statusMessages: Record<number, string> = {
-      400: "Bad request. Please check your input.",
-      401: "You are not authenticated. Please sign in.",
-      403: "You do not have permission to perform this action.",
-      404: "The requested resource was not found.",
-      409: "A conflict occurred. The resource may already exist.",
-      422: "Validation failed. Please check your input.",
-      429: "Too many requests. Please slow down.",
-      500: "Internal server error. Please try again later.",
-      502: "Bad gateway. The server is temporarily unavailable.",
-      503: "Service unavailable. Please try again later.",
+      400: "Invalid input. Please re-check your data.",
+      401: "Session expired. Please log in again.",
+      403: "Access denied. Admin permissions required.",
+      404: "Resource not found.",
+      409: "Data conflict. The resource likely already exists.",
+      422: "Validation error. Check your input fields.",
+      429: "Rate limit exceeded. Please wait a moment.",
+      500: "Server error. We are investigating.",
+      503: "Maintenance mode. Please try in a few minutes.",
     };
 
-    const friendlyMessage = message !== error.message
-      ? message
-      : (statusMessages[status] ?? message);
-
+    const friendlyMessage = (statusMessages[status] || message) as string;
     return Promise.reject(new Error(friendlyMessage));
   }
 );

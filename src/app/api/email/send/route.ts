@@ -7,6 +7,8 @@ import { decrypt } from "@/src/lib/encrypt";
 import User from "@/src/models/UserSchema";
 import Company from "@/src/models/CompanySchema";
 import EmailLog, { IDeliveryResult } from "@/src/models/EmailSchema";
+import { rateLimiter, rateLimitResponse } from "@/src/lib/rateLimiter";
+import { SendEmailSchema } from "@/src/lib/validations";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,16 +19,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // ── 2. Parse body ─────────────────────────────────────────────────────────
+    // ── 2. Rate Limiting (by user) ──────────────────────────────────────────
+    const userEmail = session.user.email;
+    const { success, retryAfter } = rateLimiter(`send-email-${userEmail}`, {
+      limit: 3,           // Max 3 bulk send actions
+      windowMs: 3600000,  // per 1 hour
+    });
+
+    if (!success) {
+      return rateLimitResponse(retryAfter);
+    }
+
+    // ── 3. Parse and Validate Form data ───────────────────────────────────────
     const formData = await req.formData();
+    const companyIds = formData.getAll("companyIds") as string[];
     const subject = formData.get("subject") as string;
     const emailBody = formData.get("emailBody") as string;
-    const companyIds = formData.getAll("companyIds") as string[];
 
-    if (!companyIds?.length || !subject || !emailBody) {
+    const validation = SendEmailSchema.safeParse({
+      companyIds,
+      subject,
+      emailBody,
+    });
+
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "companyIds, subject, and emailBody are required" },
-        { status: 400 },
+        { error: validation.error.issues[0].message },
+        { status: 400 }
       );
     }
 
