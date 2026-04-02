@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEmailStore } from "@/src/store/Emailstore";
 import { emailService } from "@/src/services/Email.service";
-import { Search, X, Paperclip, AlertCircle, CheckCircle } from "lucide-react";
+import { Search, X, Paperclip, AlertCircle, CheckCircle, Send } from "lucide-react";
 import toast from "react-hot-toast";
 
 const categories = [
@@ -22,31 +22,34 @@ export default function HomePage() {
   const router = useRouter();
   const store = useEmailStore();
 
-  const {
-    companySearchResults, selectedCompanies, subject,
-    emailBody, isSending, sendResult, sendError,
-  } = store;
+  const { companySearchResults, selectedCompanies, subject, emailBody, isSending, sendResult, sendError } = store;
 
   const [search, setSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [showCompanyPanel, setShowCompanyPanel] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🔐 AUTHORIZATION CHECK
   useEffect(() => {
     if (status === "loading") return;
     if (!session) router.push("/login");
   }, [session, status, router]);
 
-  // ✅ CLEAR ERROR/SUCCESS ON MOUNT (handles page reload)
   useEffect(() => {
     store.setSendError(null);
     store.setSendResult(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 🔥 FETCH COMPANIES WITH FILTERS
+  // Suppress Next.js dev overlay for handled promise rejections
+  useEffect(() => {
+    const handler = (e: PromiseRejectionEvent) => { e.preventDefault(); };
+    window.addEventListener("unhandledrejection", handler);
+    return () => window.removeEventListener("unhandledrejection", handler);
+  }, []);
+
   useEffect(() => {
     const fetchCompanies = async () => {
       setIsSearchLoading(true);
@@ -56,7 +59,7 @@ export default function HomePage() {
           category: selectedCategories.length > 0 ? selectedCategories[0] : undefined,
         });
         store.setCompanySearchResults(res.data, res.pagination);
-      } catch (error: any) {
+      } catch {
         toast.error("Failed to search companies");
       } finally {
         setIsSearchLoading(false);
@@ -64,31 +67,24 @@ export default function HomePage() {
     };
     const timer = setTimeout(fetchCompanies, 300);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, selectedCategories]);
 
-  // ✅ AUTO-DISMISS after 5 seconds
   useEffect(() => {
     if (!sendError && !sendResult) return;
-    const timer = setTimeout(() => {
-      store.setSendError(null);
-      store.setSendResult(null);
-    }, 5000);
+    const timer = setTimeout(() => { store.setSendError(null); store.setSendResult(null); }, 5000);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sendError, sendResult]);
 
-  const clearErrorState = () => {
-    store.setSendError(null);
-    store.setSendResult(null);
-  };
+  const clearState = () => { store.setSendError(null); store.setSendResult(null); };
 
-  // 🔥 SEND EMAIL
   const handleSend = async () => {
     if (!subject.trim()) { toast.error("Please enter an email subject"); return; }
     if (!emailBody.trim()) { toast.error("Please write an email body"); return; }
     if (selectedCompanies.length === 0) { toast.error("Please select at least one company"); return; }
 
-    clearErrorState(); // ✅ Clear before each new send attempt
-
+    clearState();
     store.setIsSending(true);
     const toastId = toast.loading("Sending emails...");
 
@@ -96,51 +92,40 @@ export default function HomePage() {
       const formData = new FormData();
       formData.append("subject", subject.trim());
       formData.append("emailBody", emailBody.trim());
-      selectedCompanies.forEach((company) => formData.append("companyIds", company._id));
-      attachments.forEach((file) => formData.append("attachments", file));
+      selectedCompanies.forEach((c) => formData.append("companyIds", c._id));
+      attachments.forEach((f) => formData.append("attachments", f));
 
       const res = await emailService.sendEmailWithAttachments(formData);
-
       store.setSendResult(res);
       store.clearCompose();
       setAttachments([]);
-
-      toast.success(`Successfully sent to ${res?.summary?.totalSent ?? selectedCompanies.length} company(ies)!`, { id: toastId });
+      toast.success(`Sent to ${res?.summary?.totalSent ?? selectedCompanies.length} company(ies)!`, { id: toastId });
     } catch (err: any) {
-      const errorMsg = err.message || "Failed to send emails";
-      store.setSendError(errorMsg);
-      toast.error(errorMsg, { id: toastId });
+      const msg = err.message || "Failed to send emails";
+      store.setSendError(msg);
+      toast.error(msg, { id: toastId });
     } finally {
       store.setIsSending(false);
     }
   };
 
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [cat]
-    );
-  };
+  const toggleCategory = (cat: string) =>
+    setSelectedCategories((prev) => prev.includes(cat) ? prev.filter((c) => c !== cat) : [cat]);
 
   const handleAttachClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-      fileInputRef.current.click();
-    }
+    e.preventDefault(); e.stopPropagation();
+    if (fileInputRef.current) { fileInputRef.current.value = ""; fileInputRef.current.click(); }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
     const validFiles: File[] = [];
     Array.from(files).forEach((file) => {
       if (!ALLOWED_PDF_TYPES.includes(file.type)) { toast.error(`${file.name} is not a PDF.`); return; }
       if (file.size > MAX_FILE_SIZE) { toast.error(`${file.name} exceeds 5MB limit`); return; }
       validFiles.push(file);
     });
-
     if (validFiles.length > 0) {
       if (attachments.length + validFiles.length > 10) { toast.error("Maximum 10 attachments allowed"); return; }
       setAttachments((prev) => [...prev, ...validFiles]);
@@ -148,17 +133,13 @@ export default function HomePage() {
     }
   };
 
-  const removeAttachment = (index: number) => {
+  const removeAttachment = (index: number) =>
     setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
 
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500" />
       </div>
     );
   }
@@ -166,196 +147,279 @@ export default function HomePage() {
   if (!session) return null;
 
   return (
-    <div className="flex h-screen bg-slate-50">
-      {/* LEFT PANEL */}
-      <div className="w-[25%] border-r bg-white p-6 overflow-y-auto">
-        <h2 className="text-lg font-semibold mb-4">Select Companies</h2>
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-3 text-gray-400" size={16} />
-          <input
-            placeholder="Search companies..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-xl border bg-slate-50 focus:outline-none focus:ring-2 focus:ring-amber-400"
-          />
+    <div className="flex h-full min-h-0">
+      {/* ── LEFT PANEL: Company selector ────────────────────── */}
+      {/* Desktop: always visible. Mobile: slide-over panel */}
+      <div
+        className={`
+          flex-shrink-0 bg-white border-r border-slate-200
+          flex flex-col
+          transition-all duration-300
+          /* Desktop */
+          lg:w-72 lg:relative lg:translate-x-0 lg:shadow-none
+          /* Mobile: full-screen overlay */
+          ${showCompanyPanel
+            ? "fixed inset-0 z-30 w-full"
+            : "hidden lg:flex"
+          }
+        `}
+      >
+        {/* Mobile header */}
+        <div className="lg:hidden flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <span className="font-semibold text-slate-800">Select Companies</span>
+          <button onClick={() => setShowCompanyPanel(false)} className="p-1 rounded-lg hover:bg-slate-100">
+            <X size={20} />
+          </button>
         </div>
 
-        <div className="mb-6">
-          <p className="text-xs font-semibold text-gray-600 mb-2">CATEGORIES</p>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => toggleCategory(cat)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-                  selectedCategories.includes(cat)
-                    ? "bg-amber-500 text-white border-amber-500"
-                    : "bg-white border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+        <div className="p-5 flex-1 overflow-y-auto">
+          {/* Desktop heading */}
+          <h2 className="hidden lg:block text-base font-semibold text-slate-800 mb-4">Select Companies</h2>
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <input
+              placeholder="Search companies..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50
+                focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+            />
           </div>
-        </div>
 
-        <div className="space-y-2">
-          {isSearchLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500 mx-auto"></div>
-            </div>
-          ) : companySearchResults.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 text-sm">No companies found.</div>
-          ) : (
-            companySearchResults.map((c) => {
-              const selected = selectedCompanies.some((sc) => sc._id === c._id);
-              return (
-                <div
-                  key={c._id}
-                  onClick={() => selected ? store.removeSelectedCompany(c._id) : store.addSelectedCompany(c)}
-                  className={`p-4 rounded-xl border cursor-pointer transition ${
-                    selected ? "bg-amber-50 border-amber-400 shadow-md" : "bg-white border-gray-200 hover:border-gray-300"
+          {/* Categories */}
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Categories</p>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => toggleCategory(cat)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                    selectedCategories.includes(cat)
+                      ? "bg-amber-500 text-white border-amber-500"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-amber-300"
                   }`}
                 >
-                  <div className="font-medium text-gray-900">{c.name}</div>
-                  <div className="text-xs text-gray-500 mt-1">{c.category}</div>
-                </div>
-              );
-            })
-          )}
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Company list */}
+          <div className="space-y-2">
+            {isSearchLoading ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500" />
+              </div>
+            ) : companySearchResults.length === 0 ? (
+              <div className="text-center py-10 text-slate-400 text-sm">No companies found.</div>
+            ) : (
+              companySearchResults.map((c) => {
+                const selected = selectedCompanies.some((sc) => sc._id === c._id);
+                return (
+                  <div
+                    key={c._id}
+                    onClick={() => {
+                      selected ? store.removeSelectedCompany(c._id) : store.addSelectedCompany(c);
+                    }}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                      selected
+                        ? "bg-amber-50 border-amber-400 shadow-sm"
+                        : "bg-white border-slate-200 hover:border-amber-300 hover:bg-amber-50/30"
+                    }`}
+                  >
+                    <div className="font-medium text-slate-800 text-sm">{c.name}</div>
+                    <div className="text-xs text-slate-400 mt-0.5 truncate">{c.category}</div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
+
+        {/* Mobile: done button */}
+        {showCompanyPanel && (
+          <div className="lg:hidden p-4 border-t border-slate-100">
+            <button
+              onClick={() => setShowCompanyPanel(false)}
+              className="w-full py-3 bg-amber-500 text-white rounded-xl font-medium text-sm"
+            >
+              Done ({selectedCompanies.length} selected)
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* RIGHT PANEL */}
-      <div className="flex-1 p-8 flex flex-col">
-        {selectedCompanies.length > 0 && (
-          <div className="mb-6">
-            <p className="text-xs font-semibold text-gray-600 mb-3">
-              SELECTED COMPANIES ({selectedCompanies.length})
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {selectedCompanies.map((c) => (
-                <div key={c._id} className="flex items-center gap-2 px-3 py-2 bg-amber-100 text-amber-900 rounded-full text-sm font-medium">
-                  {c.name}
-                  <X size={14} className="cursor-pointer hover:text-amber-700" onClick={() => store.removeSelectedCompany(c._id)} />
+      {/* ── RIGHT PANEL: Compose ────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col max-w-3xl w-full mx-auto">
+
+          {/* Selected companies + mobile "choose" button */}
+          <div className="mb-5">
+            {/* Mobile button to open company selector */}
+            <button
+              onClick={() => setShowCompanyPanel(true)}
+              className="lg:hidden w-full mb-3 flex items-center justify-between px-4 py-3
+                bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700
+                hover:border-amber-400 transition"
+            >
+              <span>
+                {selectedCompanies.length === 0
+                  ? "Choose companies to send to..."
+                  : `${selectedCompanies.length} compan${selectedCompanies.length !== 1 ? "ies" : "y"} selected`}
+              </span>
+              <Search size={16} className="text-slate-400" />
+            </button>
+
+            {selectedCompanies.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                  Selected ({selectedCompanies.length})
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedCompanies.map((c) => (
+                    <div
+                      key={c._id}
+                      className="flex items-center gap-1.5 pl-3 pr-2 py-1.5
+                        bg-amber-100 text-amber-900 rounded-full text-xs font-medium"
+                    >
+                      {c.name}
+                      <button onClick={() => store.removeSelectedCompany(c._id)}
+                        className="rounded-full hover:bg-amber-200 p-0.5 transition">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+          </div>
+
+          {/* Alerts */}
+          {sendResult && (
+            <div onClick={clearState}
+              className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl
+                flex items-start gap-3 cursor-pointer hover:bg-green-100 transition">
+              <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-green-900 text-sm">Emails sent successfully!</p>
+                <p className="text-xs text-green-700 mt-0.5">
+                  {sendResult?.summary?.totalSent ?? 0} sent
+                  {sendResult?.summary?.totalFailed > 0 && (
+                    <span className="text-orange-600"> · {sendResult.summary.totalFailed} failed</span>
+                  )}
+                </p>
+              </div>
+              <X size={14} className="text-green-500 flex-shrink-0" />
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ✅ SUCCESS — click anywhere on banner to dismiss */}
-        {sendResult && (
-          <div
-            onClick={clearErrorState}
-            className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3 cursor-pointer"
-          >
-            <CheckCircle size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="font-medium text-green-900">Emails sent successfully!</p>
-              <p className="text-sm text-green-800 mt-1">
-                {sendResult?.summary?.totalSent ?? 0} email(s) sent
-                {sendResult?.summary?.totalFailed > 0 && (
-                  <span className="text-orange-700"> · {sendResult.summary.totalFailed} failed</span>
-                )}
-              </p>
+          {sendError && (
+            <div onClick={clearState}
+              className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl
+                flex items-start gap-3 cursor-pointer hover:bg-red-100 transition">
+              <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700 flex-1 min-w-0">{sendError}</p>
+              <X size={14} className="text-red-400 flex-shrink-0" />
             </div>
-            <X size={16} className="text-green-600 flex-shrink-0" />
+          )}
+
+          {/* Subject */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Subject</label>
+            <input
+              placeholder="e.g., Partnership Opportunity"
+              value={subject}
+              onChange={(e) => store.setSubject(e.target.value)}
+              className="w-full px-4 py-3 text-sm rounded-xl border border-slate-200 bg-white
+                focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+            />
           </div>
-        )}
 
-        {/* ✅ ERROR — click anywhere on banner to dismiss */}
-        {sendError && (
-          <div
-            onClick={clearErrorState}
-            className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 cursor-pointer"
-          >
-            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-800 flex-1">{sendError}</p>
-            <X size={16} className="text-red-600 flex-shrink-0" />
+          {/* Body */}
+          <div className="mb-4 flex flex-col flex-1 min-h-0">
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Body</label>
+            <textarea
+              placeholder="Write your message here... (HTML supported)"
+              value={emailBody}
+              onChange={(e) => store.setEmailBody(e.target.value)}
+              className="flex-1 min-h-[180px] lg:min-h-0 p-4 text-sm border border-slate-200 rounded-xl
+                focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
+            />
+            <p className="text-xs text-slate-400 mt-1.5">{emailBody.length} characters</p>
           </div>
-        )}
 
-        {/* SUBJECT */}
-        <div className="mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Email Subject</label>
-          <input
-            placeholder="e.g., Partnership Opportunity"
-            value={subject}
-            onChange={(e) => store.setSubject(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-          />
-        </div>
-
-        {/* EMAIL BODY */}
-        <div className="mb-4 flex-1 flex flex-col">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Email Body</label>
-          <textarea
-            placeholder="Write your email message here... (HTML supported)"
-            value={emailBody}
-            onChange={(e) => store.setEmailBody(e.target.value)}
-            className="flex-1 p-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
-          />
-          <p className="text-xs text-gray-500 mt-2">{emailBody.length} characters</p>
-        </div>
-
-        {/* ATTACHMENTS */}
-        <div className="mb-6">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".pdf,application/pdf"
-            onChange={handleFileChange}
-            style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, pointerEvents: "none", overflow: "hidden" }}
-            tabIndex={-1}
-            aria-hidden="true"
-          />
-          <button
-            type="button"
-            onClick={handleAttachClick}
-            className="w-full flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-xl hover:border-amber-400 hover:bg-amber-50 transition"
-          >
-            <Paperclip size={16} className="text-gray-600" />
-            <span className="text-sm font-medium text-gray-700">
+          {/* Attachments */}
+          <div className="mb-5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,application/pdf"
+              onChange={handleFileChange}
+              style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, overflow: "hidden" }}
+              tabIndex={-1}
+              aria-hidden="true"
+            />
+            <button
+              type="button"
+              onClick={handleAttachClick}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5
+                border-2 border-dashed border-slate-300 rounded-xl text-sm font-medium text-slate-600
+                hover:border-amber-400 hover:bg-amber-50 hover:text-amber-700 transition"
+            >
+              <Paperclip size={15} />
               Add PDF Attachments {attachments.length > 0 && `(${attachments.length})`}
-            </span>
-          </button>
-          <p className="text-xs text-gray-500 mt-1">PDFs only • Max 5MB per file • Max 10 files</p>
+            </button>
+            <p className="text-xs text-slate-400 mt-1">PDFs only · Max 5MB per file · Max 10 files</p>
 
-          {attachments.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {attachments.map((file, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Paperclip size={14} className="text-gray-400 flex-shrink-0" />
-                    <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                    <span className="text-xs text-gray-500 flex-shrink-0">({(file.size / 1024).toFixed(1)}KB)</span>
+            {attachments.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {attachments.map((file, idx) => (
+                  <div key={idx} className="flex items-center justify-between px-3 py-2
+                    bg-slate-50 border border-slate-200 rounded-lg">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Paperclip size={13} className="text-slate-400 flex-shrink-0" />
+                      <span className="text-xs text-slate-700 truncate">{file.name}</span>
+                      <span className="text-xs text-slate-400 flex-shrink-0">
+                        {(file.size / 1024).toFixed(0)}KB
+                      </span>
+                    </div>
+                    <button onClick={() => removeAttachment(idx)}
+                      className="ml-2 flex-shrink-0 text-red-400 hover:text-red-600 transition">
+                      <X size={14} />
+                    </button>
                   </div>
-                  <button type="button" onClick={() => removeAttachment(idx)} className="ml-2 flex-shrink-0 text-red-500 hover:text-red-700">
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-        {/* SEND BUTTON */}
-        <button
-          onClick={handleSend}
-          disabled={isSending || selectedCompanies.length === 0 || !subject.trim() || !emailBody.trim()}
-          className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-        >
-          {isSending ? (
-            <span className="flex items-center justify-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-r-transparent"></div>
-              Sending emails...
-            </span>
-          ) : (
-            `Send to ${selectedCompanies.length} Compan${selectedCompanies.length !== 1 ? "ies" : "y"}`
-          )}
-        </button>
+          {/* Send button */}
+          <button
+            onClick={handleSend}
+            disabled={isSending || selectedCompanies.length === 0 || !subject.trim() || !emailBody.trim()}
+            className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white
+              rounded-xl font-semibold text-sm flex items-center justify-center gap-2
+              hover:shadow-lg hover:shadow-amber-500/30 transition-all
+              disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+          >
+            {isSending ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-r-transparent" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send size={16} />
+                Send to {selectedCompanies.length} Compan{selectedCompanies.length !== 1 ? "ies" : "y"}
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
