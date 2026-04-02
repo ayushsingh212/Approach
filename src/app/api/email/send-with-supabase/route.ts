@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authOptions } from "@/src/lib/auth";
 import EmailLog from "@/src/models/EmailSchema";
 import Company from "@/src/models/CompanySchema";
 import { sendEmailWithLinks } from "@/src/lib/nodemailer-supabase";
