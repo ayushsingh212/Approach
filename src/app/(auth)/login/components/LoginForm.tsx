@@ -50,7 +50,7 @@ export default function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isLoading}
-          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all [&:-webkit-autofill]:bg-slate-50 [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_rgb(248,250,252)]"
+          className="w-full px-4 text-black py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all [&:-webkit-autofill]:bg-slate-50 [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_rgb(248,250,252)]"
           placeholder="executive@company.com"
         />
       </div>
@@ -70,7 +70,7 @@ export default function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={isLoading}
-            className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all [&:-webkit-autofill]:bg-slate-50 [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_rgb(248,250,252)]"
+            className="w-full px-4 text-black py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all [&:-webkit-autofill]:bg-slate-50 [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_rgb(248,250,252)]"
             placeholder="••••••••"
           />
           <button

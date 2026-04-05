@@ -25,7 +25,7 @@ export default function AuthPage() {
 
       {/* Right panel — white card on mobile, plain flex on desktop */}
       <div className="flex-1 flex justify-center items-start lg:items-center px-5 py-8 lg:p-10">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-7 lg:shadow-none lg:rounded-none lg:p-0 lg:bg-transparent">
+        <div className="w-full text-black max-w-md bg-white rounded-2xl shadow-xl p-7 lg:shadow-none lg:rounded-none lg:p-0 lg:bg-transparent">
           <AuthTabs tab={tab} setTab={setTab} />
           {tab === "login" ? (
             <LoginForm />
