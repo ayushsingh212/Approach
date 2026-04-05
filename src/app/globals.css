@@ -29,6 +29,7 @@
   --foreground: #0f172a;
 }
 
+
 /* ===========================
    Base Reset
 =========================== */
@@ -171,6 +172,13 @@ body {
 .delay-400 { animation-delay: 400ms; }
 .delay-500 { animation-delay: 500ms; }
 
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0px 1000px rgb(248, 250, 252) inset !important;
+  background-color: rgb(248, 250, 252) !important;
+}
 /* ===========================
    Decorative Backgrounds
 =========================== */
