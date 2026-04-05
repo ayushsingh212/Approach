@@ -30,7 +30,7 @@ export default function LoginForm() {
       await login(email.trim(), password);
       const session = await getSession();
       if (!session) throw new Error("Session not established");
-      
+
       toast.success("Welcome back! Redirecting…", { id: toastId });
       router.push("/profile");
     } catch (err: any) {
@@ -50,7 +50,7 @@ export default function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isLoading}
-          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-amber-400"
+          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all"
           placeholder="executive@company.com"
         />
       </div>
@@ -70,14 +70,13 @@ export default function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={isLoading}
-            className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 pr-12"
+            className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 pr-12 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all"
             placeholder="••••••••"
           />
-
           <button
             type="button"
             onClick={() => setShowPass(!showPass)}
-            className="absolute right-3 top-1/2 -translate-y-1/2"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600"
           >
             {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -98,7 +97,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white py-3 rounded-xl shadow-lg"
+        className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-medium"
       >
         {isLoading ? (
           <>

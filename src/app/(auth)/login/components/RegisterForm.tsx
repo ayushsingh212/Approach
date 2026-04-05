@@ -41,17 +41,14 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
       toast.error("All fields are required.");
       return;
     }
-
     if (form.password.length < 8) {
       toast.error("Password must be at least 8 characters.");
       return;
     }
-
     if (form.password !== form.confirmPassword) {
       toast.error("Passwords do not match.");
       return;
     }
-
     if (!form.senderEmail.endsWith("@gmail.com")) {
       toast.error("Sender email must be a Gmail address.");
       return;
@@ -89,7 +86,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
 
   const labelClass =
     "text-xs lg:text-sm font-medium text-slate-700 flex items-center gap-2";
-
+    
   return (
     <form className="flex flex-col gap-4 lg:gap-5" onSubmit={handleSubmit}>
 
@@ -204,7 +201,6 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
             Get one →
           </a>
         </label>
-
         <div className="relative">
           <input
             type={showAppPass ? "text" : "password"}
@@ -218,7 +214,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
           <button
             type="button"
             onClick={() => setShowAppPass(!showAppPass)}
-            className="absolute right-3 top-1/2 -translate-y-1/2"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600"
           >
             {showAppPass ? <EyeOff size={15} /> : <Eye size={15} />}
           </button>

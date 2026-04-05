@@ -11,24 +11,21 @@ import { Toaster } from "react-hot-toast";
 export default function AuthPage() {
   const [tab, setTab] = useState<"login" | "register">("login");
   const [mounted, setMounted] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-100 lg:bg-white">
       <Toaster />
 
-      <MobileHeader
-        mobileMenuOpen={mobileMenuOpen}
-        setMobileMenuOpen={setMobileMenuOpen}
-      />
+      <MobileHeader />
 
-      <LeftPanel mobileMenuOpen={mobileMenuOpen} />
+      <LeftPanel mobileMenuOpen={false} />
 
-      <div className="flex-1 flex justify-center items-center p-10">
-        <div className="w-full max-w-md">
+      {/* Right panel — white card on mobile, plain flex on desktop */}
+      <div className="flex-1 flex justify-center items-start lg:items-center px-5 py-8 lg:p-10">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-7 lg:shadow-none lg:rounded-none lg:p-0 lg:bg-transparent">
           <AuthTabs tab={tab} setTab={setTab} />
           {tab === "login" ? (
             <LoginForm />
