@@ -139,7 +139,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
               onChange={set("password")}
               disabled={isLoading}
               className={`${inputClass} pr-10`}
-              placeholder="Min 8 chars"
+              placeholder="Min 10 chars"
             />
             <button
               type="button"
