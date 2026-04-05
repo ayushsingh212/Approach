@@ -43,7 +43,7 @@ export default function Dashboard() {
     );
   }
 
-  if (error) {
+  if (error && !user) {
     return (
       <div className="p-6">
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>
@@ -53,7 +53,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-slate-50 min-h-screen">
-      <div className="max-w-2xl mx-auto">
+      <div className=" mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Your Profile</h1>
