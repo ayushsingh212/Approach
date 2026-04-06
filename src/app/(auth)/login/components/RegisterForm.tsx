@@ -82,10 +82,10 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
   };
 
   const inputClass =
-    "w-full px-4 py-3 lg:py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400/20 focus:border-amber-400 transition-all duration-300 text-sm disabled:opacity-60";
-
+  "w-full px-4 py-3 text-black lg:py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400/20 focus:border-amber-400 transition-all duration-300 text-sm disabled:opacity-60 [&:-webkit-autofill]:bg-slate-50 [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_rgb(248,250,252)]";
+  
   const labelClass =
-    "text-xs lg:text-sm font-medium text-slate-700 flex items-center gap-2";
+    "text-xs lg:text-sm text-black font-medium text-slate-700 flex items-center gap-2";
     
   return (
     <form className="flex flex-col gap-4 lg:gap-5" onSubmit={handleSubmit}>
@@ -139,7 +139,7 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
               onChange={set("password")}
               disabled={isLoading}
               className={`${inputClass} pr-10`}
-              placeholder="Min 8 chars"
+              placeholder="Min 10 chars"
             />
             <button
               type="button"
