@@ -4,7 +4,7 @@ export interface IUser {
   _id: string;
   name: string;
   email: string;             // login email
-  senderEmail: string;       // Gmail used to send emails
+  senderEmail: string;       
   role: "user" | "admin";
   isVerified: boolean;
   emailsSentCount: number;
@@ -18,8 +18,6 @@ export interface RegisterPayload {
   name: string;
   email: string;
   password: string;
-  senderEmail: string;
-  googleAppPassword: string;
 }
 
 export interface LoginPayload {

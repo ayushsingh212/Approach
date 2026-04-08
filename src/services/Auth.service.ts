@@ -14,9 +14,7 @@ export const authService = {
       console.log("🚀 [REGISTER] Starting registration with payload:", {
         name: payload.name,
         email: payload.email,
-        senderEmail: payload.senderEmail,
         passwordLength: payload.password?.length,
-        googleAppPasswordLength: payload.googleAppPassword?.length,
       });
 
       const { data } = await api.post<{ message: string; user: IUser }>(

@@ -50,7 +50,6 @@ const UserSchema = new Schema<IUser>(
 
     senderEmail: {
       type: String,
-      required: [true, "Sender Gmail address is required"],
       lowercase: true,
       trim: true,
       match: [/^\S+@gmail\.com$/, "Sender email must be a valid Gmail address"],
@@ -58,8 +57,7 @@ const UserSchema = new Schema<IUser>(
 
     googleAppPassword: {
       type: String,
-      required: [true, "Google App Password is required"],
-      select: false, // Never returned in queries by default
+      select: false,
     },
 
     role: {
@@ -70,7 +68,7 @@ const UserSchema = new Schema<IUser>(
 
     isVerified: {
       type: Boolean,
-      default: true, // Set to false if you add email verification later
+      default: false,
     },
 
     emailsSentCount: {
@@ -117,6 +115,9 @@ UserSchema.set("toJSON", {
 });
 
 // ─── Export ───────────────────────────────────────────────────────────────────
+if (mongoose.models.User) {
+  delete mongoose.models.User;  // ← force re-register with new schema
+}
 
 const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);

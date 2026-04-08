@@ -23,21 +23,18 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
     email: "",
     password: "",
     confirmPassword: "",
-    senderEmail: "",
-    googleAppPassword: "",
   });
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value;
     if (field === "name") val = stripEmojis(val);
-    if (field === "googleAppPassword") val = val.replace(/\s/g, "");
     setForm((prev) => ({ ...prev, [field]: val }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.name.trim() || !form.email.trim() || !form.password || !form.senderEmail.trim() || !form.googleAppPassword.trim()) {
+    if (!form.name.trim() || !form.email.trim() || !form.password) {
       toast.error("All fields are required.");
       return;
     }
@@ -49,16 +46,6 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
       toast.error("Passwords do not match.");
       return;
     }
-    if (!form.senderEmail.endsWith("@gmail.com")) {
-      toast.error("Sender email must be a Gmail address.");
-      return;
-    }
-
-    const cleanApp = form.googleAppPassword.replace(/\s/g, "");
-    if (cleanApp.length !== 16) {
-      toast.error("Google App Password must be exactly 16 characters.");
-      return;
-    }
 
     const toastId = toast.loading("Creating your account…");
 
@@ -67,8 +54,6 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
-        senderEmail: form.senderEmail.trim(),
-        googleAppPassword: cleanApp,
       });
 
       toast.loading("Signing you in…", { id: toastId });
@@ -165,59 +150,6 @@ export default function RegisterForm({ onSwitchTab }: { onSwitchTab: () => void 
             className={inputClass}
             placeholder="Repeat"
           />
-        </div>
-      </div>
-
-      {/* Sender Gmail */}
-      <div className="space-y-2">
-        <label className={labelClass}>
-          <Mail size={14} className="text-slate-400" />
-          Sender Gmail
-          <span className="ml-auto text-[10px] text-slate-400">
-            emails sent FROM this
-          </span>
-        </label>
-        <input
-          type="email"
-          maxLength={100}
-          value={form.senderEmail}
-          onChange={set("senderEmail")}
-          disabled={isLoading}
-          className={inputClass}
-          placeholder="yourname@gmail.com"
-        />
-      </div>
-
-      {/* App Password */}
-      <div className="space-y-2">
-        <label className={labelClass}>
-          <KeyRound size={14} className="text-slate-400" />
-          Google App Password
-          <a
-            href="https://myaccount.google.com/apppasswords"
-            target="_blank"
-            className="ml-auto text-[10px] text-amber-600 hover:underline"
-          >
-            Get one →
-          </a>
-        </label>
-        <div className="relative">
-          <input
-            type={showAppPass ? "text" : "password"}
-            maxLength={16}
-            value={form.googleAppPassword}
-            onChange={set("googleAppPassword")}
-            disabled={isLoading}
-            className={`${inputClass} pr-10 tracking-widest`}
-            placeholder="xxxx xxxx xxxx xxxx"
-          />
-          <button
-            type="button"
-            onClick={() => setShowAppPass(!showAppPass)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600"
-          >
-            {showAppPass ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
         </div>
       </div>
 
