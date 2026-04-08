@@ -17,14 +17,6 @@ export const RegisterSchema = z.object({
   password: z.string()
     .min(10, "Password must be at least 10 characters for better security")
     .max(128, "Password too long"),
-  senderEmail: z.string()
-    .email("Invalid sender email")
-    .regex(/@gmail\.com$/, "Only Gmail is supported for sender email")
-    .toLowerCase()
-    .trim(),
-  googleAppPassword: z.string()
-    .length(16, "Google App Password must be exactly 16 characters (no spaces)")
-    .regex(/^[a-z]+$/, "App Password should be lowercase alphabetic characters"),
 });
 
 export const LoginSchema = z.object({

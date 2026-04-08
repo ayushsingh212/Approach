@@ -31,14 +31,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, email, password, senderEmail, googleAppPassword } = result.data;
-
-    // ── 3. Gmail Credential Verification ──────────────────────────────────────
-    const cleanAppPassword = googleAppPassword.replace(/\s/g, "");
-    const gmailCheck = await verifyGmailCredentials(senderEmail, cleanAppPassword);
-    if (!gmailCheck.valid) {
-      return NextResponse.json({ error: gmailCheck.error }, { status: 400 });
-    }
+    const { name, email, password} = result.data;
 
     await connectDB();
 
@@ -53,19 +46,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Encrypt Google App Password before saving ─────────────────────────────
-    const encryptedAppPassword = encrypt(cleanAppPassword);
-
     // ── Create user (password hashed by pre-save hook) ────────────────────────
     const user = await UserModel.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
-      password,                        // hashed in pre-save hook
-      senderEmail: senderEmail.toLowerCase().trim(),
-      googleAppPassword: encryptedAppPassword,
+      password,                        
     });
 
-    // toJSON strips password and googleAppPassword automatically
     return NextResponse.json(
       {
         message: "Account created successfully",
@@ -74,7 +61,6 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    // Mongoose validation error
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map(
         (e: any) => e.message
@@ -82,7 +68,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: messages.join(", ") }, { status: 400 });
     }
 
-    // Duplicate key (race condition)
     if (error.code === 11000) {
       return NextResponse.json(
         { error: "An account with this email already exists" },

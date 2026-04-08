@@ -11,6 +11,7 @@ import { useDebounce } from "@/src/Hooks/useDebounce";
 import { useThrottle } from "@/src/Hooks/useThrottle";
 import { stripEmojis } from "@/src/utils/sanitization";
 import { SkeletonCard } from "@/src/components/ui/Skeleton";
+import { useAuth } from "@/src/Hooks/Useauth";
 
 const categories = [
   "Technology", "Finance", "Healthcare", "Education", "Marketing",
@@ -24,6 +25,8 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { user } = useAuth();
+  const hasSenderEmail = !!user?.senderEmail;
   const store = useEmailStore();
 
   const { companySearchResults, selectedCompanies, subject, emailBody, isSending, sendResult, sendError } = store;
@@ -200,11 +203,10 @@ export default function HomePage() {
                 <button
                   key={cat}
                   onClick={() => toggleCategory(cat)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                    selectedCategories.includes(cat)
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${selectedCategories.includes(cat)
                       ? "bg-amber-500 text-white border-amber-500"
                       : "bg-white border-slate-200 text-slate-600 hover:border-amber-300"
-                  }`}
+                    }`}
                 >
                   {cat}
                 </button>
@@ -231,11 +233,10 @@ export default function HomePage() {
                     onClick={() => {
                       selected ? store.removeSelectedCompany(c._id) : store.addSelectedCompany(c);
                     }}
-                    className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                      selected
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all ${selected
                         ? "bg-amber-50 border-amber-400 shadow-sm"
                         : "bg-white border-slate-200 hover:border-amber-300 hover:bg-amber-50/30"
-                    }`}
+                      }`}
                   >
                     <div className="font-medium text-slate-800 text-sm">{c.name}</div>
                     <div className="text-xs text-slate-400 mt-0.5 truncate">{c.category}</div>
@@ -406,7 +407,7 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Send button */}
+          {/* Send button
           <button
             onClick={handleSend}
             disabled={isSending || selectedCompanies.length === 0 || !subject.trim() || !emailBody.trim()}
@@ -426,7 +427,41 @@ export default function HomePage() {
                 Send to {selectedCompanies.length} Compan{selectedCompanies.length !== 1 ? "ies" : "y"}
               </>
             )}
-          </button>
+          </button> */}
+          {!hasSenderEmail ? (
+            <button
+              onClick={() => {
+                toast.error("Please update your sender email first!");
+                router.push("/profile");
+              }}
+              className="w-full py-3.5 bg-gradient-to-r from-slate-400 to-slate-500 text-white
+      rounded-xl font-semibold text-sm flex items-center justify-center gap-2
+      hover:shadow-lg transition-all"
+            >
+              ✉️ Update Your Sender Email
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={isSending || selectedCompanies.length === 0 || !subject.trim() || !emailBody.trim()}
+              className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white
+      rounded-xl font-semibold text-sm flex items-center justify-center gap-2
+      hover:shadow-lg hover:shadow-amber-500/30 transition-all
+      disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+            >
+              {isSending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-r-transparent" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send size={16} />
+                  Send to {selectedCompanies.length} Compan{selectedCompanies.length !== 1 ? "ies" : "y"}
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
