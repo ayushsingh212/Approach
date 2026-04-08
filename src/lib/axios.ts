@@ -101,7 +101,7 @@ api.interceptors.response.use(
       503: "Maintenance mode. Please try in a few minutes.",
     };
 
-    const friendlyMessage = (statusMessages[status] || message) as string;
+    const friendlyMessage = message || statusMessages[status] as string;
     return Promise.reject(new Error(friendlyMessage));
   }
 );

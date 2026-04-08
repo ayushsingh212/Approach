@@ -115,6 +115,9 @@ UserSchema.set("toJSON", {
 });
 
 // ─── Export ───────────────────────────────────────────────────────────────────
+if (mongoose.models.User) {
+  delete mongoose.models.User;  // ← force re-register with new schema
+}
 
 const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
