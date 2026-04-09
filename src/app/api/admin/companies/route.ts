@@ -65,10 +65,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const {
-      name, email, category,
-      website, description, location, tags,
-    } = result.data;
+    const { name, email, category } = result.data;
 
     await connectDB();
 
@@ -82,10 +79,6 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       category,
-      website: website?.trim() || undefined,
-      description: description?.trim() || undefined,
-      location: location?.trim() || undefined,
-      tags: Array.isArray(tags) ? tags : [],
       addedBy: admin._id,
     });
 

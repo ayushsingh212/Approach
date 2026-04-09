@@ -5,7 +5,6 @@ import { useAdmin } from "@/src/Hooks/Useadmin";
 import { AddCompanyPayload, CompanyCategory, COMPANY_CATEGORIES } from "@/src/types/admin.types";
 import { Plus, X, Building2, Users, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useDebounce } from "@/src/Hooks/useDebounce";
-import { stripEmojis } from "@/src/utils/sanitization";
 import { SkeletonCard, SkeletonRow } from "@/src/components/ui/Skeleton";
 
 export default function AdminPanel() {
@@ -25,7 +24,7 @@ export default function AdminPanel() {
   const [filterCategory, setFilterCategory] = useState<CompanyCategory | "">("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<AddCompanyPayload>({
-    name: "", email: "", category: [], website: "", description: "", location: "", tags: [],
+    name: "", email: "", category: [],
   });
 
   const hasFetchedRef = useRef<Record<string, boolean>>({});
@@ -54,7 +53,7 @@ export default function AdminPanel() {
     setIsSubmitting(true);
     try {
       await addCompany(formData);
-      setFormData({ name: "", email: "", category: [], website: "", description: "", location: "", tags: [] });
+      setFormData({ name: "", email: "", category: [] });
       setShowAddForm(false);
     } catch (err: any) {
       alert(`Error: ${err?.response?.data?.error || err.message}`);
@@ -133,7 +132,7 @@ export default function AdminPanel() {
                       <input
                         type="text"
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: stripEmojis(e.target.value) })}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="Acme Corp"
                         className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
                           focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -173,43 +172,6 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Website</label>
-                      <input
-                        type="url"
-                        value={formData.website}
-                        onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                        placeholder="https://example.com"
-                        className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
-                          focus:outline-none focus:ring-2 focus:ring-amber-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Location</label>
-                      <input
-                        maxLength={100}
-                        value={formData.location}
-                        onChange={(e) => setFormData({ ...formData, location: stripEmojis(e.target.value) })}
-                        placeholder="New Delhi, India"
-                        className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
-                          focus:outline-none focus:ring-2 focus:ring-amber-400"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Description</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: stripEmojis(e.target.value) })}
-                      placeholder="Brief description..."
-                      maxLength={500}
-                      rows={3}
-                      className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
-                        focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
-                    />
-                  </div>
 
                   <button
                     type="submit"
