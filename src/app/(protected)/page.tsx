@@ -190,7 +190,7 @@ export default function HomePage() {
               placeholder="Search companies..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50
+              className="w-full pl-9 text-slate-900 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50
                 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
             />
           </div>
@@ -342,7 +342,7 @@ export default function HomePage() {
               maxLength={150}
               value={subject}
               onChange={(e) => store.setSubject(stripEmojis(e.target.value))}
-              className="w-full px-4 py-3 text-sm rounded-xl border border-slate-200 bg-white
+              className="w-full px-4 py-3 text-sm text-slate-900 rounded-xl border border-slate-200 bg-white
                 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
             />
           </div>
@@ -355,7 +355,7 @@ export default function HomePage() {
               maxLength={10000}
               value={emailBody}
               onChange={(e) => store.setEmailBody(stripEmojis(e.target.value))}
-              className="flex-1 min-h-[180px] lg:min-h-0 p-4 text-sm border border-slate-200 rounded-xl
+              className="flex-1 min-h-[180px] lg:min-h-0 p-4 text-sm text-slate-900 border border-slate-200 rounded-xl
                 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
             />
             <p className="text-xs text-slate-400 mt-1.5">{emailBody.length} characters</p>

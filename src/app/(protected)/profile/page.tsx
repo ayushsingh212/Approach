@@ -143,7 +143,7 @@ export default function Dashboard() {
                 placeholder="yourname@gmail.com"
                 value={senderEmail}
                 onChange={(e) => setSenderEmail(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl
+                className="w-full px-4 py-2.5 text-slate-900 text-sm border border-slate-200 rounded-xl
                   focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
               />
             </div>
@@ -156,7 +156,7 @@ export default function Dashboard() {
                 placeholder="16-character app password"
                 value={appPassword}
                 onChange={(e) => setAppPassword(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl
+                className="w-full px-4 py-2.5 text-slate-900 text-sm border border-slate-200 rounded-xl
                   focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
               />
               <p className="text-xs text-slate-400 mt-1">
