@@ -1,26 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-// ─── Route protection map ─────────────────────────────────────────────────────
-//
-//  /profile/*   → any logged-in user
-//  /admin/*       → role === "admin" only
-//  /authpage/*    → redirect to dashboard if already logged in
-//  /api/admin/*   → role === "admin" only (API level guard)
-//  /api/user/*    → any logged-in user
-//  /api/email/*   → any logged-in user
-//
-// ─────────────────────────────────────────────────────────────────────────────
-
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Get JWT token from cookie (works with NextAuth JWT strategy)
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
+    // ✅ This is the fix — App Router uses a different cookie name than Pages Router
+    cookieName:
+      process.env.NODE_ENV === "production"
+        ? "__Secure-next-auth.session-token"
+        : "next-auth.session-token",
   });
 
+  console.log("🔑 Middleware token:", JSON.stringify(token, null, 2));
   const isLoggedIn = !!token;
   const isAdmin = token?.role === "admin";
 
@@ -38,7 +32,6 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/authpage", req.url));
     }
     if (!isAdmin) {
-      // Logged in but not admin → send to dashboard with error
       return NextResponse.redirect(new URL("/profile?error=forbidden", req.url));
     }
     return NextResponse.next();
@@ -76,28 +69,18 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── 5. Standard Security Headers ──────────────────────────────────────────
+  // ── 6. Standard Security Headers ─────────────────────────────────────────
   const response = NextResponse.next();
-  
-  // Prevent MIME type sniffing
   response.headers.set("X-Content-Type-Options", "nosniff");
-  // Prevent site being framed (Clickjacking) - set to 'DENY' or 'SAMEORIGIN'
   response.headers.set("X-Frame-Options", "DENY");
-  // Enable browser XSS protection
   response.headers.set("X-XSS-Protection", "1; mode=block");
-  // Strict Referrer Policy
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  // HSTS (Strict-Transport-Security) - only if HTTPS
   if (process.env.NODE_ENV === "production") {
     response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   }
 
   return response;
 }
-
-// ─── Matcher: which paths this middleware runs on ─────────────────────────────
-// Skips: _next/static, _next/image, favicon, public files
-// Includes: all pages + all api routes we care about
 
 export const config = {
   matcher: [
