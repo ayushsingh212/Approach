@@ -7,7 +7,6 @@ export async function middleware(req: NextRequest) {
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
-    // ✅ This is the fix — App Router uses a different cookie name than Pages Router
     cookieName:
       process.env.NODE_ENV === "production"
         ? "__Secure-next-auth.session-token"
