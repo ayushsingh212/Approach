@@ -134,7 +134,7 @@ export default function AdminPanel() {
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="Acme Corp"
-                        className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
+                        className="w-full px-3 py-2.5 text-sm text-black border border-slate-200 rounded-xl
                           focus:outline-none focus:ring-2 focus:ring-amber-400"
                       />
                     </div>
@@ -147,7 +147,7 @@ export default function AdminPanel() {
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase().trim() })}
                         placeholder="contact@company.com"
-                        className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl
+                        className="w-full px-3 py-2.5 text-sm text-black border border-slate-200 rounded-xl
                           focus:outline-none focus:ring-2 focus:ring-amber-400"
                       />
                     </div>
