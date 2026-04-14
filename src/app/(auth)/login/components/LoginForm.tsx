@@ -32,7 +32,7 @@ export default function LoginForm() {
       if (!session) throw new Error("Session not established");
 
       toast.success("Welcome back! Redirecting…", { id: toastId });
-      router.push("/profile");
+      router.push("/");
     } catch (err: any) {
       toast.error(err.message ?? "Login failed.", { id: toastId });
     }
@@ -40,7 +40,6 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      {/* Email */}
       <div>
         <label className="text-sm flex items-center gap-2 text-slate-600 mb-2">
           <Mail size={14} /> Corporate Email

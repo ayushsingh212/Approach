@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ── POST add new company ──────────────────────────────────────────────────────
+// ── POST add new company (supports bulk) ──────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,16 +56,32 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const result = CompanySchemaValidation.safeParse(body);
+    const isBatch = Array.isArray(body);
 
-    if (!result.success) {
-      return NextResponse.json(
-        { error: result.error.issues[0].message },
-        { status: 400 }
-      );
+    if (isBatch && body.length > 15) {
+      return NextResponse.json({ error: "Maximum 15 companies allowed at once" }, { status: 400 });
     }
 
-    const { name, email, category } = result.data;
+    const validateItem = (item: any) => CompanySchemaValidation.safeParse(item);
+
+    let itemsToValidate = isBatch ? body : [body];
+    let companiesToCreate = [];
+
+    // Validate all items
+    for (let i = 0; i < itemsToValidate.length; i++) {
+      const result = validateItem(itemsToValidate[i]);
+      if (!result.success) {
+        const errorMsg = isBatch 
+          ? `Row ${i + 1} (${itemsToValidate[i].name || 'unnamed'}): ${result.error.issues[0].message}`
+          : result.error.issues[0].message;
+        
+        return NextResponse.json(
+          { error: errorMsg },
+          { status: 400 }
+        );
+      }
+      companiesToCreate.push(result.data);
+    }
 
     await connectDB();
 
@@ -75,15 +91,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Admin user not found" }, { status: 404 });
     }
 
-    const company = await Company.create({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      category,
+    // Map to schema format
+    const companiesToInsert = companiesToCreate.map(c => ({
+      name: c.name.trim(),
+      email: c.email.toLowerCase().trim(),
+      category: c.category,
       addedBy: admin._id,
-    });
+    }));
+
+    // Use insertMany for efficiency
+    const createdCompanies = await Company.insertMany(companiesToInsert);
 
     return NextResponse.json(
-      { message: "Company added successfully", company },
+      { 
+        message: isBatch 
+          ? `Successfully added ${createdCompanies.length} companies` 
+          : "Company added successfully", 
+        companies: createdCompanies,
+        // For backward compatibility with existing frontend expectations
+        company: createdCompanies[0]
+      },
       { status: 201 }
     );
   } catch (error: any) {
@@ -93,7 +120,7 @@ export async function POST(req: NextRequest) {
     }
     if (error.code === 11000) {
       return NextResponse.json(
-        { error: "A company with this email already exists" },
+        { error: "One or more companies already exist with these email addresses" },
         { status: 409 }
       );
     }

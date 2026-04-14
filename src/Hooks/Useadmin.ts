@@ -39,7 +39,9 @@ export function useAdmin() {
   const setCompaniesError   = useAdminStore((s) => s.setCompaniesError);
   const setCompanyFilters   = useAdminStore((s) => s.setCompanyFilters);
   const addCompanyToList    = useAdminStore((s) => s.addCompanyToList);
+  const addCompaniesToList   = useAdminStore((s) => s.addCompaniesToList);
   const updateCompanyInList = useAdminStore((s) => s.updateCompanyInList);
+  const removeCompanyFromList = useAdminStore((s) => s.removeCompanyFromList);
 
   // ── User state ─────────────────────────────────────────────────────────
   const users          = useAdminStore((s) => s.users);
@@ -101,17 +103,21 @@ export function useAdmin() {
   );
 
   /**
-   * addCompany - Create new company
+   * addCompany - Create new company or companies
    * ✅ Re-throws so form can show inline feedback
    */
   const addCompany = useCallback(
-    async (payload: AddCompanyPayload) => {
+    async (payload: AddCompanyPayload | AddCompanyPayload[]) => {
       setCompaniesLoading(true);
       setCompaniesError(null);
       try {
-        const company = await adminService.addCompany(payload);
-        addCompanyToList(company);
-        return company;
+        const result = await adminService.addCompany(payload);
+        if (Array.isArray(result)) {
+          addCompaniesToList(result);
+        } else {
+          addCompanyToList(result);
+        }
+        return result;
       } catch (err: any) {
         const msg = err?.response?.data?.error || err?.message || "Failed to add company";
         setCompaniesError(msg);
@@ -120,8 +126,9 @@ export function useAdmin() {
         setCompaniesLoading(false);
       }
     },
-    [addCompanyToList, setCompaniesLoading, setCompaniesError]
+    [addCompaniesToList, addCompanyToList, setCompaniesLoading, setCompaniesError]
   );
+
 
   /**
    * updateCompany - Update company details
@@ -144,7 +151,7 @@ export function useAdmin() {
   );
 
   /**
-   * deleteCompany - Soft-delete company
+   * deleteCompany - Hard-delete company from DB and remove from list
    * ✅ Re-throws for explicit feedback
    */
   const deleteCompany = useCallback(
@@ -152,7 +159,7 @@ export function useAdmin() {
       setCompaniesError(null);
       try {
         const result = await adminService.deleteCompany(id);
-        updateCompanyInList(id, { isActive: false });
+        removeCompanyFromList(id);
         return result;
       } catch (err: any) {
         const msg = err?.response?.data?.error || err?.message || "Failed to delete company";
@@ -160,7 +167,7 @@ export function useAdmin() {
         throw err;
       }
     },
-    [updateCompanyInList, setCompaniesError]
+    [removeCompanyFromList, setCompaniesError]
   );
 
   /**

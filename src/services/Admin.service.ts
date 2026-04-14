@@ -9,23 +9,6 @@ import {
 } from "@/src/types/admin.types";
 import api from "@/src/lib/axios";
 
-/**
- * ✅ COMPLETE Admin Service
- * 
- * All admin API endpoints:
- * - GET /api/admin/companies (list with filters)
- * - POST /api/admin/companies (add)
- * - GET /api/admin/companies/:id (single)
- * - PUT /api/admin/companies/:id (update)
- * - DELETE /api/admin/companies/:id (delete/soft-delete)
- * - GET /api/admin/users (list)
- * - PATCH /api/admin/users (update role)
- * 
- * ✅ Supports multiple categories per company
- * ✅ Proper error propagation
- * ✅ Type-safe payloads and responses
- */
-
 export const adminService = {
   // ═════════════════════════════════════════════════════════════════════════
   // COMPANIES ENDPOINTS
@@ -62,31 +45,24 @@ export const adminService = {
 
   /**
    * POST /api/admin/companies
-   * Create a new company with multiple categories
+   * Create one or many new companies
    * 
-   * @param payload - { name, email, category: string[], website?, description?, location?, tags? }
-   * @returns Created company with array of categories
-   * 
-   * @example
-   * const company = await adminService.addCompany({
-   *   name: "Tech Corp",
-   *   email: "contact@techcorp.com",
-   *   category: ["Technology", "Finance"],  // ✅ Multiple categories
-   *   website: "https://techcorp.com"
-   * });
+   * @param payload - AddCompanyPayload | AddCompanyPayload[]
+   * @returns Created company or array of created companies
    */
-  addCompany: async (payload: AddCompanyPayload): Promise<ICompany> => {
+  addCompany: async (payload: AddCompanyPayload | AddCompanyPayload[]): Promise<ICompany | ICompany[]> => {
     try {
-      const { data } = await api.post<{ company: ICompany; message: string }>(
+      const { data } = await api.post<{ company: ICompany; companies: ICompany[]; message: string }>(
         "/admin/companies",
         payload
       );
-      return data.company;
+      return Array.isArray(payload) ? data.companies : data.company;
     } catch (error: any) {
       console.error("[adminService] addCompany failed:", error.message);
       throw error;
     }
   },
+
 
   /**
    * GET /api/admin/companies/:id
