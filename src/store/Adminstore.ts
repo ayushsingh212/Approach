@@ -30,6 +30,7 @@ interface AdminState {
   setCompaniesLoading:   (loading: boolean) => void;
   setCompaniesError:     (error: string | null) => void;
   addCompanyToList:      (company: ICompany) => void;
+  addCompaniesToList:     (companies: ICompany[]) => void;
   updateCompanyInList:   (id: string, updated: Partial<ICompany>) => void;
   removeCompanyFromList: (id: string) => void;
 
@@ -69,7 +70,23 @@ export const useAdminStore = create<AdminState>((set) => ({
   setCompaniesError:   (companiesError)   => set({ companiesError }),
 
   addCompanyToList: (company) =>
-    set((state) => ({ companies: [company, ...state.companies] })),
+    set((state) => ({
+      companies: [company, ...state.companies],
+      companyPagination: state.companyPagination
+        ? { ...state.companyPagination, total: state.companyPagination.total + 1 }
+        : null,
+    })),
+
+  addCompaniesToList: (newCompanies) =>
+    set((state) => ({
+      companies: [...newCompanies, ...state.companies],
+      companyPagination: state.companyPagination
+        ? {
+            ...state.companyPagination,
+            total: state.companyPagination.total + newCompanies.length,
+          }
+        : null,
+    })),
 
   updateCompanyInList: (id, updated) =>
     set((state) => ({

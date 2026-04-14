@@ -23,9 +23,9 @@ export default function AdminPanel() {
 
   const [filterCategory, setFilterCategory] = useState<CompanyCategory | "">("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState<AddCompanyPayload>({
-    name: "", email: "", category: [],
-  });
+  const [batchData, setBatchData] = useState<AddCompanyPayload[]>([
+    { name: "", email: "", category: [] },
+  ]);
 
   const hasFetchedRef = useRef<Record<string, boolean>>({});
 
@@ -44,30 +44,74 @@ export default function AdminPanel() {
     });
   }, [debouncedSearchUser, fetchUsers]);
 
-  const handleAddCompany = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email || formData.category.length === 0) {
-      alert("Please fill in name, email, and at least one category");
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await addCompany(formData);
-      setFormData({ name: "", email: "", category: [] });
-      setShowAddForm(false);
-    } catch (err: any) {
-      alert(`Error: ${err?.response?.data?.error || err.message}`);
-    } finally {
-      setIsSubmitting(false);
+  const handleAddRow = () => {
+    if (batchData.length < 15) {
+      setBatchData([...batchData, { name: "", email: "", category: [] }]);
     }
   };
 
-  const toggleCategory = (cat: CompanyCategory) => {
-    const isSelected = formData.category.includes(cat);
-    setFormData({
-      ...formData,
-      category: isSelected ? formData.category.filter((c) => c !== cat) : [...formData.category, cat],
-    });
+  const removeBatchRow = (index: number) => {
+    if (batchData.length > 1) {
+      const updated = [...batchData];
+      updated.splice(index, 1);
+      setBatchData(updated);
+    }
+  };
+
+  const updateBatchRow = (index: number, field: keyof AddCompanyPayload, value: string) => {
+    const updated = [...batchData];
+    updated[index] = { ...updated[index], [field]: value };
+
+    // Auto-add a new empty row when the user starts typing in the LAST row's name field
+    if (field === "name" && index === updated.length - 1 && updated.length < 15) {
+      if (value.trim() !== "") {
+        updated.push({ name: "", email: "", category: [] });
+      }
+    }
+
+    setBatchData(updated);
+  };
+
+  const toggleBatchCategory = (index: number, cat: CompanyCategory) => {
+    const updated = [...batchData];
+    const currentCategories = updated[index].category;
+    const isSelected = currentCategories.includes(cat);
+
+    updated[index].category = isSelected
+      ? currentCategories.filter((c) => c !== cat)
+      : [...currentCategories, cat];
+
+    setBatchData(updated);
+  };
+
+  const handleBulkSubmit = async () => {
+    // Filter out completely empty rows
+    const validRows = batchData.filter(row => row.name.trim() !== "" && row.email.trim() !== "");
+    
+    if (validRows.length === 0) {
+      alert("Please enter at least one company with name and email");
+      return;
+    }
+
+    // Check if any valid row is missing categories
+    const incompleteRow = validRows.find(row => row.category.length === 0);
+    if (incompleteRow) {
+      alert(`Please select at least one category for "${incompleteRow.name}"`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addCompany(validRows);
+      // Reset to one empty row
+      setBatchData([{ name: "", email: "", category: [] }]);
+      setShowAddForm(false);
+    } catch (err: any) {
+      // Error is already handled by useAdmin and stored in state
+      console.error("Bulk submission failed", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -109,7 +153,13 @@ export default function AdminPanel() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-slate-800">Companies</h2>
               <button
-                onClick={() => setShowAddForm(!showAddForm)}
+                onClick={() => {
+                  if (showAddForm) {
+                    // Reset when closing
+                    setBatchData([{ name: "", email: "", category: [] }]);
+                  }
+                  setShowAddForm(!showAddForm);
+                }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition
                   ${showAddForm
                     ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
@@ -119,71 +169,118 @@ export default function AdminPanel() {
               </button>
             </div>
 
-            {/* Add form */}
+            {/* Bulk Add Form */}
             {showAddForm && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                <h3 className="font-semibold text-slate-800 mb-4">New Company</h3>
-                <form onSubmit={handleAddCompany} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                        Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Acme Corp"
-                        className="w-full px-3 py-2.5 text-sm text-black border border-slate-200 rounded-xl
-                          focus:outline-none focus:ring-2 focus:ring-amber-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                        Email *
-                      </label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase().trim() })}
-                        placeholder="contact@company.com"
-                        className="w-full px-3 py-2.5 text-sm text-black border border-slate-200 rounded-xl
-                          focus:outline-none focus:ring-2 focus:ring-amber-400"
-                      />
-                    </div>
-                  </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-lg overflow-hidden transition-all">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    <Plus size={18} className="text-amber-500" />
+                    Add Multiple Companies
+                  </h3>
+                  <span className="text-xs font-semibold px-2 py-1 bg-amber-50 text-amber-600 rounded-lg">
+                    Max 15 rows
+                  </span>
+                </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                      Categories * <span className="font-normal normal-case">(select all that apply)</span>
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {COMPANY_CATEGORIES.map((cat) => {
-                        const sel = formData.category.includes(cat);
-                        return (
-                          <button key={cat} type="button" onClick={() => toggleCategory(cat)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
-                              sel ? "bg-amber-500 text-white border-amber-500" : "bg-white text-slate-600 border-slate-200 hover:border-amber-300"
-                            }`}>
-                            {sel && "✓ "}{cat}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                <div className="overflow-x-auto -mx-5 px-5 mb-6">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-widest px-2">#</th>
+                        <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-widest px-2 min-w-[200px]">Name *</th>
+                        <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-widest px-2 min-w-[250px]">Email *</th>
+                        <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-widest px-2 min-w-[300px]">Categories *</th>
+                        <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-widest px-2 w-[50px]"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {batchData.map((row, idx) => (
+                        <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
+                          <td className="py-3 px-2 text-xs font-medium text-slate-400">{idx + 1}</td>
+                          <td className="py-3 px-2">
+                            <input
+                              type="text"
+                              value={row.name}
+                              onChange={(e) => updateBatchRow(idx, "name", e.target.value)}
+                              placeholder="Company name"
+                              className="w-full bg-transparent border-0 focus:ring-0 text-sm py-1 placeholder:text-slate-300 font-medium"
+                            />
+                          </td>
+                          <td className="py-3 px-2">
+                            <input
+                              type="email"
+                              value={row.email}
+                              onChange={(e) => updateBatchRow(idx, "email", e.target.value.toLowerCase().trim())}
+                              placeholder="email@example.com"
+                              className="w-full bg-transparent border-0 focus:ring-0 text-sm py-1 placeholder:text-slate-300"
+                            />
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="flex flex-wrap gap-1">
+                              {COMPANY_CATEGORIES.map((cat) => {
+                                const selected = row.category.includes(cat);
+                                return (
+                                  <button
+                                    key={cat}
+                                    type="button"
+                                    onClick={() => toggleBatchCategory(idx, cat)}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
+                                      selected
+                                        ? "bg-amber-500 text-white border-amber-500"
+                                        : "bg-white text-slate-400 border-slate-200 hover:border-amber-300"
+                                    }`}
+                                  >
+                                    {cat}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2">
+                            {batchData.length > 1 && (
+                              <button
+                                onClick={() => removeBatchRow(idx)}
+                                className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white
-                      rounded-xl font-semibold text-sm hover:shadow-lg transition disabled:opacity-50"
+                    type="button"
+                    onClick={handleAddRow}
+                    disabled={batchData.length >= 15}
+                    className="flex-1 py-1.5 border-2 border-dashed border-slate-200 text-slate-400 text-xs font-bold
+                      rounded-xl hover:border-amber-300 hover:text-amber-500 transition disabled:opacity-30 uppercase tracking-widest"
                   >
-                    {isSubmitting ? "Adding..." : "Add Company"}
+                    + Add Row Manually
                   </button>
-                </form>
+                  <button
+                    onClick={handleBulkSubmit}
+                    disabled={isSubmitting}
+                    className="flex-[2] py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm
+                      hover:bg-amber-500 shadow-md hover:shadow-amber-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                        Saving Companies...
+                      </span>
+                    ) : (
+                      <>Submit {batchData.filter(r => r.name && r.email).length} Companies</>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
+
 
             {/* Error */}
             {companiesError && (

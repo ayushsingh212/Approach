@@ -32,7 +32,7 @@ export default function LoginForm() {
       if (!session) throw new Error("Session not established");
 
       toast.success("Welcome back! Redirecting…", { id: toastId });
-      router.push("/profile");
+      router.push("/");
     } catch (err: any) {
       toast.error(err.message ?? "Login failed.", { id: toastId });
     }
