@@ -58,7 +58,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const isBatch = Array.isArray(body);
 
-    // If batch, check limit
     if (isBatch && body.length > 15) {
       return NextResponse.json({ error: "Maximum 15 companies allowed at once" }, { status: 400 });
     }
@@ -128,4 +127,4 @@ export async function POST(req: NextRequest) {
     console.error("[ADMIN ADD COMPANY ERROR]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+}

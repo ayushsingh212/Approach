@@ -8,6 +8,7 @@ import { useDebounce } from "@/src/Hooks/useDebounce";
 import { SkeletonCard, SkeletonRow } from "@/src/components/ui/Skeleton";
 
 export default function AdminPanel() {
+  
   const {
     companies, companyPagination, companiesLoading, companiesError,
     fetchCompanies, addCompany, updateCompany, deleteCompany, clearCompaniesError,
@@ -44,17 +45,35 @@ export default function AdminPanel() {
     });
   }, [debouncedSearchUser, fetchUsers]);
 
-  const handleAddRow = () => {
-    if (batchData.length < 15) {
-      setBatchData([...batchData, { name: "", email: "", category: [] }]);
+  // Removes empty rows (name+email+category all blank) that have non-empty rows after them.
+  // Always keeps one trailing empty row for typing, and at least 1 row total.
+  const cleanupRows = (rows: AddCompanyPayload[]): AddCompanyPayload[] => {
+    const result: AddCompanyPayload[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const isEmpty =
+        row.name.trim() === "" &&
+        row.email.trim() === "" &&
+        row.category.length === 0;
+      const isLast = i === rows.length - 1;
+
+      if (isEmpty && !isLast) {
+        // Only remove if there's actual content somewhere below
+        const hasContentAfter = rows
+          .slice(i + 1)
+          .some((r) => r.name.trim() !== "" || r.email.trim() !== "");
+        if (hasContentAfter) continue; // skip (remove) this empty row
+      }
+      result.push(row);
     }
+    return result.length === 0 ? [{ name: "", email: "", category: [] }] : result;
   };
 
   const removeBatchRow = (index: number) => {
     if (batchData.length > 1) {
       const updated = [...batchData];
       updated.splice(index, 1);
-      setBatchData(updated);
+      setBatchData(cleanupRows(updated));
     }
   };
 
@@ -62,14 +81,17 @@ export default function AdminPanel() {
     const updated = [...batchData];
     updated[index] = { ...updated[index], [field]: value };
 
-    // Auto-add a new empty row when the user starts typing in the LAST row's name field
-    if (field === "name" && index === updated.length - 1 && updated.length < 15) {
-      if (value.trim() !== "") {
-        updated.push({ name: "", email: "", category: [] });
-      }
+    // Auto-add: typing in the last row's name → append a new empty row
+    if (
+      field === "name" &&
+      index === updated.length - 1 &&
+      value.trim() !== "" &&
+      updated.length < 15
+    ) {
+      updated.push({ name: "", email: "", category: [] });
     }
 
-    setBatchData(updated);
+    setBatchData(cleanupRows(updated));
   };
 
   const toggleBatchCategory = (index: number, cat: CompanyCategory) => {
@@ -81,7 +103,7 @@ export default function AdminPanel() {
       ? currentCategories.filter((c) => c !== cat)
       : [...currentCategories, cat];
 
-    setBatchData(updated);
+    setBatchData(cleanupRows(updated));
   };
 
   const handleBulkSubmit = async () => {
@@ -252,20 +274,11 @@ export default function AdminPanel() {
                   </table>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    type="button"
-                    onClick={handleAddRow}
-                    disabled={batchData.length >= 15}
-                    className="flex-1 py-1.5 border-2 border-dashed border-slate-200 text-slate-400 text-xs font-bold
-                      rounded-xl hover:border-amber-300 hover:text-amber-500 transition disabled:opacity-30 uppercase tracking-widest"
-                  >
-                    + Add Row Manually
-                  </button>
+                <div className="flex justify-end">
                   <button
                     onClick={handleBulkSubmit}
                     disabled={isSubmitting}
-                    className="flex-[2] py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm
+                    className="w-full sm:w-auto px-8 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm
                       hover:bg-amber-500 shadow-md hover:shadow-amber-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {isSubmitting ? (
