@@ -41,6 +41,7 @@ export function useAdmin() {
   const addCompanyToList    = useAdminStore((s) => s.addCompanyToList);
   const addCompaniesToList   = useAdminStore((s) => s.addCompaniesToList);
   const updateCompanyInList = useAdminStore((s) => s.updateCompanyInList);
+  const removeCompanyFromList = useAdminStore((s) => s.removeCompanyFromList);
 
   // ── User state ─────────────────────────────────────────────────────────
   const users          = useAdminStore((s) => s.users);
@@ -150,7 +151,7 @@ export function useAdmin() {
   );
 
   /**
-   * deleteCompany - Soft-delete company
+   * deleteCompany - Hard-delete company from DB and remove from list
    * ✅ Re-throws for explicit feedback
    */
   const deleteCompany = useCallback(
@@ -158,7 +159,7 @@ export function useAdmin() {
       setCompaniesError(null);
       try {
         const result = await adminService.deleteCompany(id);
-        updateCompanyInList(id, { isActive: false });
+        removeCompanyFromList(id);
         return result;
       } catch (err: any) {
         const msg = err?.response?.data?.error || err?.message || "Failed to delete company";
@@ -166,7 +167,7 @@ export function useAdmin() {
         throw err;
       }
     },
-    [updateCompanyInList, setCompaniesError]
+    [removeCompanyFromList, setCompaniesError]
   );
 
   /**

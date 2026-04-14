@@ -108,7 +108,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 }
 
-// ── DELETE soft-delete company ────────────────────────────────────────────────
+// ── DELETE hard-delete company ────────────────────────────────────────────────
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!isValidId(params.id)) {
@@ -118,22 +118,18 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     await connectDB();
 
-    const company = await Company.findByIdAndUpdate(
-      params.id,
-      { $set: { isActive: false } },
-      { new: true }
-    );
+    const company = await Company.findByIdAndDelete(params.id);
 
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
 
     return NextResponse.json({
-      message: "Company deactivated (soft deleted)",
+      message: "Company permanently deleted",
       company,
     });
   } catch (error) {
     console.error("[ADMIN DELETE COMPANY ERROR]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+}

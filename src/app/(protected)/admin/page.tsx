@@ -203,7 +203,7 @@ export default function AdminPanel() {
                               value={row.name}
                               onChange={(e) => updateBatchRow(idx, "name", e.target.value)}
                               placeholder="Company name"
-                              className="w-full bg-transparent border-0 focus:ring-0 text-sm py-1 placeholder:text-slate-300 font-medium"
+                              className="w-full bg-transparent border-none outline-none focus:outline-none ring-0 focus:ring-0 text-sm py-1 text-black placeholder:text-slate-300 font-medium"
                             />
                           </td>
                           <td className="py-3 px-2">
@@ -212,7 +212,7 @@ export default function AdminPanel() {
                               value={row.email}
                               onChange={(e) => updateBatchRow(idx, "email", e.target.value.toLowerCase().trim())}
                               placeholder="email@example.com"
-                              className="w-full bg-transparent border-0 focus:ring-0 text-sm py-1 placeholder:text-slate-300"
+                              className="w-full bg-transparent border-none outline-none focus:outline-none ring-0 focus:ring-0 text-sm py-1 text-black placeholder:text-slate-300"
                             />
                           </td>
                           <td className="py-3 px-2">
