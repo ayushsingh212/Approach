@@ -36,13 +36,17 @@ export const emailService = {
   /**
    * GET /api/companies
    * Public endpoint — searches active companies to populate the send-to selector.
+   * Supports pagination (page, limit) for infinite-scroll loading.
    * Uses MongoDB full-text index on name, category, tags, location.
    */
   searchCompanies: async (
     filters?: CompanySearchFilters,
   ): Promise<PaginatedResponse<ICompany>> => {
     const { data } = await api.get<PaginatedResponse<ICompany>>("/companies", {
-      params: filters,
+      params: {
+        ...filters,
+        limit: filters?.limit ?? 20, // default page size = 20
+      },
     });
     return data;
   },

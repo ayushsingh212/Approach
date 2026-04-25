@@ -30,8 +30,9 @@ interface EmailState {
   logsError:       string | null;
 
   // ── Company search actions ─────────────────────────────────────────────────
-  setCompanySearchResults:  (results: ICompany[], pagination: Pagination) => void;
-  setCompanySearchLoading:  (loading: boolean) => void;
+  setCompanySearchResults:    (results: ICompany[], pagination: Pagination) => void;
+  appendCompanySearchResults: (results: ICompany[], pagination: Pagination) => void; // infinite scroll
+  setCompanySearchLoading:    (loading: boolean) => void;
 
   // ── Selection actions ─────────────────────────────────────────────────────
   setSelectedCompanies:   (companies: ICompany[]) => void;
@@ -81,6 +82,17 @@ export const useEmailStore = create<EmailState>((set) => ({
   // ── Implementations ───────────────────────────────────────────────────────
   setCompanySearchResults: (results, pagination) =>
     set({ companySearchResults: results, companySearchPagination: pagination }),
+
+  appendCompanySearchResults: (results, pagination) =>
+    set((state) => {
+      // Deduplicate by _id using a Map to guard against any race condition
+      const existing = new Map(state.companySearchResults.map((c) => [c._id.toString(), c]));
+      results.forEach((c) => existing.set(c._id.toString(), c));
+      return {
+        companySearchResults:    Array.from(existing.values()),
+        companySearchPagination: pagination,
+      };
+    }),
 
   setCompanySearchLoading: (companySearchLoading) =>
     set({ companySearchLoading }),
