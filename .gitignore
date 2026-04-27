@@ -8,3 +8,4 @@ coverage
 # Logs
 logs
 *.log   
+/src/generated/prisma

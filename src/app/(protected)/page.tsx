@@ -21,6 +21,7 @@ import { useThrottle } from "@/src/Hooks/useThrottle";
 import { stripEmojis } from "@/src/utils/sanitization";
 import { SkeletonCard } from "@/src/components/ui/Skeleton";
 import { useAuth } from "@/src/Hooks/Useauth";
+import { useSentEmails } from "@/src/Hooks/useSentEmails";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,9 @@ export default function HomePage() {
   const { user } = useAuth();
   const hasSenderEmail = !!user?.senderEmail;
   const store = useEmailStore();
+
+  // ── Already-sent tracking ────────────────────────────────────────────────
+  const { sentSet, markAsSent } = useSentEmails();
 
   const {
     companySearchResults,
@@ -208,6 +212,20 @@ export default function HomePage() {
 
       const res = await emailService.sendEmailWithAttachments(formData);
       store.setSendResult(res);
+
+      // ── Optimistically mark every successfully-sent company ──────────────
+      const sentCompanyIds = (res?.deliveryResults ?? [])
+        .filter((r: any) => r.status === "sent")
+        .map((r: any) => String(r.company));
+
+      // Fallback: if deliveryResults is empty, mark all selected
+      const idsToMark =
+        sentCompanyIds.length > 0
+          ? sentCompanyIds
+          : selectedCompanies.map((c) => String(c._id));
+
+      idsToMark.forEach((id: string) => markAsSent(id));
+
       store.clearCompose();
       setAttachments([]);
       toast.success(
@@ -378,6 +396,7 @@ export default function HomePage() {
               <>
                 {companySearchResults.map((c) => {
                   const selected = selectedCompanies.some((sc) => sc._id === c._id);
+                  const alreadySent = sentSet.has(String(c._id));
                   return (
                     <div
                       key={c._id}
@@ -392,12 +411,28 @@ export default function HomePage() {
                           : "bg-white border-slate-200 hover:border-amber-300 hover:bg-amber-50/30"
                       }`}
                     >
-                      <div className="font-medium text-slate-800 text-sm">{c.name}</div>
+                      {/* Name row + Already Sent badge */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-medium text-slate-800 text-sm truncate">
+                          {c.name}
+                        </div>
+                        {alreadySent && (
+                          <span
+                            className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5
+                              rounded-full text-[10px] font-semibold
+                              bg-emerald-50 text-emerald-600 border border-emerald-200"
+                          >
+                            <CheckCircle size={9} />
+                            Sent
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-slate-400 mt-0.5 truncate">
                         {Array.isArray(c.category) ? c.category.join(", ") : c.category}
                       </div>
                     </div>
                   );
+
                 })}
 
                 {/* Sentinel: triggers next page load when visible */}
