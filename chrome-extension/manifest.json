@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Email Scraper",
+  "version": "1.0.0",
+  "description": "Scrapes emails from LinkedIn search results and syncs to the Approach database.",
+
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "http://localhost:3000/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LinkedIn Email Scraper"
+  }
+}

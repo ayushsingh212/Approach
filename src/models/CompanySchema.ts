@@ -1,9 +1,5 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
 
-// ─── Keep categories here as the single source of truth ──────────────────────
-// Import into admin.types.ts from HERE, not the other way around,
-// to avoid circular imports (types importing from models)
-
 export const COMPANY_CATEGORIES = [
   "Technology",
   "Finance",
