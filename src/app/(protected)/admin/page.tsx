@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useAdmin } from "@/src/Hooks/Useadmin";
 import { AddCompanyPayload, CompanyCategory, COMPANY_CATEGORIES } from "@/src/types/admin.types";
-import { Plus, X, Building2, Users, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import Link from "next/link";
+import { Plus, X, Building2, Users, ChevronLeft, ChevronRight, Search, Sparkles } from "lucide-react";
 import { useDebounce } from "@/src/Hooks/useDebounce";
 import { SkeletonCard, SkeletonRow } from "@/src/components/ui/Skeleton";
 
@@ -174,21 +175,30 @@ export default function AdminPanel() {
           <div className="space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-slate-800">Companies</h2>
-              <button
-                onClick={() => {
-                  if (showAddForm) {
-                    // Reset when closing
-                    setBatchData([{ name: "", email: "", category: [] }]);
-                  }
-                  setShowAddForm(!showAddForm);
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition
-                  ${showAddForm
-                    ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                    : "bg-amber-500 text-white hover:bg-amber-600 shadow-sm"}`}
-              >
-                {showAddForm ? <><X size={15} /> Cancel</> : <><Plus size={15} /> Add Company</>}
-              </button>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/admin/ai-import"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-slate-900 text-white hover:bg-slate-800 transition shadow-sm"
+                >
+                  <Sparkles size={15} />
+                  Add List
+                </Link>
+                <button
+                  onClick={() => {
+                    if (showAddForm) {
+                      // Reset when closing
+                      setBatchData([{ name: "", email: "", category: [] }]);
+                    }
+                    setShowAddForm(!showAddForm);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition
+                    ${showAddForm
+                      ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                      : "bg-amber-500 text-white hover:bg-amber-600 shadow-sm"}`}
+                >
+                  {showAddForm ? <><X size={15} /> Cancel</> : <><Plus size={15} /> Add Company</>}
+                </button>
+              </div>
             </div>
 
             {/* Bulk Add Form */}
