@@ -666,8 +666,8 @@ export default function HomePage() {
                 <p className="font-medium text-green-900 text-sm">Emails sent successfully!</p>
                 <p className="text-xs text-green-700 mt-0.5">
                   {sendResult?.summary?.totalSent ?? 0} sent
-                  {sendResult?.summary?.totalFailed > 0 && (
-                    <span className="text-orange-600"> · {sendResult.summary.totalFailed} failed</span>
+                  {(sendResult?.summary?.totalFailed ?? 0) > 0 && (
+                    <span className="text-orange-600"> · {sendResult?.summary?.totalFailed} failed</span>
                   )}
                 </p>
               </div>
