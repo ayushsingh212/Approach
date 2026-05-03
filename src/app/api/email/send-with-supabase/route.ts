@@ -111,9 +111,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No valid companies found" }, { status: 404 });
     }
 
-    // ─── SEND EMAILS ───────────────────────────────────────────────────────
-    const deliveryResults = await Promise.allSettled(
-      companies.map(async (company) => {
+    // ─── SEND EMAILS (sequential, 5s delay between each) ──────────────────
+    const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+    const deliveryResults: PromiseSettledResult<any>[] = [];
+
+    for (let i = 0; i < companies.length; i++) {
+      const company = companies[i];
+
+      const result = await (async () => {
         try {
           const messageId = await sendEmailWithLinks({
             to: company.email,
@@ -141,8 +147,15 @@ export async function POST(req: NextRequest) {
             errorMessage: error.message || "Unknown error",
           };
         }
-      })
-    );
+      })();
+
+      deliveryResults.push({ status: "fulfilled", value: result });
+
+      // Wait 5 seconds before sending the next email (skip delay after last one)
+      if (i < companies.length - 1) {
+        await delay(5000);
+      }
+    }
 
     // ─── PROCESS RESULTS ───────────────────────────────────────────────────
     const results = deliveryResults
