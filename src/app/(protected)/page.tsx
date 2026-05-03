@@ -14,6 +14,9 @@ import {
   Send,
   CheckSquare,
   Square,
+  Loader2,
+  MailCheck,
+  MailX,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useDebounce } from "@/src/Hooks/useDebounce";
@@ -64,6 +67,12 @@ export default function HomePage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showCompanyPanel, setShowCompanyPanel] = useState(false);
+
+  // ── Streaming progress state ────────────────────────────────────────────────
+  const [streamTotal, setStreamTotal] = useState(0);
+  const [streamResults, setStreamResults] = useState<any[]>([]);
+  const [streamDone, setStreamDone] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
 
   // ── Infinite-scroll state ───────────────────────────────────────────────────
   const [isFirstLoad, setIsFirstLoad] = useState(true);   // skeleton on page 1
@@ -193,49 +202,92 @@ export default function HomePage() {
     }
   };
 
-  // ── Send ────────────────────────────────────────────────────────────────────
+  // ── Send (streaming) ────────────────────────────────────────────────────────
   const handleSend = useThrottle(async () => {
     if (!subject.trim())               { toast.error("Please enter an email subject"); return; }
     if (!emailBody.trim())             { toast.error("Please write an email body"); return; }
     if (selectedCompanies.length === 0){ toast.error("Please select at least one company"); return; }
 
     clearState();
+    // Reset progress state
+    setStreamResults([]);
+    setStreamTotal(0);
+    setStreamDone(false);
+    setShowProgress(true);
     store.setIsSending(true);
-    const toastId = toast.loading("Sending emails...");
+
+    const formData = new FormData();
+    formData.append("subject",   subject.trim());
+    formData.append("emailBody", emailBody.trim());
+    selectedCompanies.forEach((c) => formData.append("companyIds", c._id));
+    attachments.forEach((f) => formData.append("attachments", f));
 
     try {
-      const formData = new FormData();
-      formData.append("subject",   subject.trim());
-      formData.append("emailBody", emailBody.trim());
-      selectedCompanies.forEach((c) => formData.append("companyIds", c._id));
-      attachments.forEach((f) => formData.append("attachments", f));
+      const response = await fetch("/api/email/send-with-supabase", {
+        method: "POST",
+        body: formData,
+      });
 
-      const res = await emailService.sendEmailWithAttachments(formData);
-      store.setSendResult(res);
+      if (!response.ok || !response.body) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || "Failed to send emails");
+      }
 
-      // ── Optimistically mark every successfully-sent company ──────────────
-      const sentCompanyIds = (res?.deliveryResults ?? [])
-        .filter((r: any) => r.status === "sent")
-        .map((r: any) => String(r.company));
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      // Fallback: if deliveryResults is empty, mark all selected
-      const idsToMark =
-        sentCompanyIds.length > 0
-          ? sentCompanyIds
-          : selectedCompanies.map((c) => String(c._id));
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      idsToMark.forEach((id: string) => markAsSent(id));
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? ""; // keep incomplete line in buffer
 
-      store.clearCompose();
-      setAttachments([]);
-      toast.success(
-        `Sent to ${res?.summary?.totalSent ?? selectedCompanies.length} company(ies)!`,
-        { id: toastId },
-      );
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+
+            if (event.type === "start") {
+              setStreamTotal(event.total);
+            }
+
+            if (event.type === "result") {
+              setStreamResults((prev) => [...prev, event.data]);
+              if (event.data.status === "sent") {
+                markAsSent(String(event.data.company));
+              }
+            }
+
+            if (event.type === "done") {
+              setStreamDone(true);
+              store.setSendResult({
+                success: true,
+                summary: event.summary,
+                deliveryResults: event.deliveryResults,
+              });
+              store.clearCompose();
+              setAttachments([]);
+              toast.success(
+                `Sent to ${event.summary.totalSent} / ${event.summary.totalTargeted} company(ies)!`
+              );
+            }
+
+            if (event.type === "error") {
+              throw new Error(event.message);
+            }
+          } catch (parseErr) {
+            // skip malformed lines
+          }
+        }
+      }
     } catch (err: any) {
       const msg = err.message || "Failed to send emails";
       store.setSendError(msg);
-      toast.error(msg, { id: toastId });
+      toast.error(msg);
+      setShowProgress(false);
     } finally {
       store.setIsSending(false);
     }
@@ -525,8 +577,85 @@ export default function HomePage() {
             )}
           </div>
 
+          {/* ── Live Streaming Progress Panel ───────────────────────────── */}
+          {showProgress && (
+            <div className="mb-5 border border-slate-200 rounded-xl overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  {!streamDone ? (
+                    <Loader2 size={15} className="animate-spin text-amber-500" />
+                  ) : (
+                    <CheckCircle size={15} className="text-green-500" />
+                  )}
+                  <span className="text-sm font-semibold text-slate-700">
+                    {streamDone
+                      ? `Done — ${streamResults.filter((r) => r.status === "sent").length} sent, ${streamResults.filter((r) => r.status === "failed").length} failed`
+                      : `Sending ${streamResults.length} / ${streamTotal}…`}
+                  </span>
+                </div>
+                {streamDone && (
+                  <button
+                    onClick={() => setShowProgress(false)}
+                    className="text-slate-400 hover:text-slate-600 transition"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+
+              {/* Progress bar */}
+              {streamTotal > 0 && (
+                <div className="h-1 bg-slate-100">
+                  <div
+                    className="h-1 bg-amber-400 transition-all duration-500"
+                    style={{ width: `${(streamResults.length / streamTotal) * 100}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Results list */}
+              <div className="max-h-52 overflow-y-auto divide-y divide-slate-100">
+                {streamResults.map((r, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                    {r.status === "sent" ? (
+                      <MailCheck size={14} className="text-green-500 flex-shrink-0" />
+                    ) : (
+                      <MailX size={14} className="text-red-400 flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-slate-800 truncate">{r.companyName}</p>
+                      <p className="text-[11px] text-slate-400 truncate">{r.companyEmail}</p>
+                    </div>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                        r.status === "sent"
+                          ? "bg-green-50 text-green-600"
+                          : "bg-red-50 text-red-500"
+                      }`}
+                    >
+                      {r.status === "sent" ? "Sent" : "Failed"}
+                    </span>
+                  </div>
+                ))}
+
+                {/* Pending rows (skeleton) */}
+                {!streamDone &&
+                  Array.from({ length: Math.max(0, streamTotal - streamResults.length) }).map((_, i) => (
+                    <div key={`pending-${i}`} className="flex items-center gap-3 px-4 py-2.5 opacity-40">
+                      <Loader2 size={14} className="text-slate-300 flex-shrink-0 animate-spin" />
+                      <div className="flex-1 space-y-1">
+                        <div className="h-2.5 bg-slate-100 rounded w-28" />
+                        <div className="h-2 bg-slate-100 rounded w-20" />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {/* Alerts */}
-          {sendResult && (
+          {!showProgress && sendResult && (
             <div
               onClick={clearState}
               className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl
