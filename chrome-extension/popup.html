@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Approach Scraper</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f14;
+      color: #e2e2f0;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #6d28d9, #4f46e5);
+      padding: 16px 18px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-icon { font-size: 22px; }
+    .header-text h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
+    .header-text p  { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+
+    /* ── Status badge ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 20px;
+      margin-left: auto;
+    }
+    .badge-idle    { background: rgba(255,255,255,0.1); color: #a5b4fc; }
+    .badge-running { background: rgba(16,185,129,0.2);  color: #6ee7b7; }
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .dot.pulse {
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+
+    /* ── Body ── */
+    .body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+    /* ── Stats grid ── */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-card {
+      background: #1a1a2a;
+      border: 1px solid #2a2a42;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .stat-label { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.6px; }
+    .stat-value { font-size: 18px; font-weight: 700; color: #a5b4fc; margin-top: 3px; }
+    .stat-value.small { font-size: 11px; color: #e2e2f0; margin-top: 4px; line-height: 1.4; }
+
+    /* ── Next alarm bar ── */
+    .alarm-bar {
+      background: #1a1a2a;
+      border: 1px solid #2a2a42;
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .alarm-icon { font-size: 16px; }
+    .alarm-text { flex: 1; }
+    .alarm-text strong { display: block; color: #c4b5fd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .alarm-text span   { color: #e2e2f0; font-size: 12px; }
+
+    /* ── Buttons ── */
+    .actions { display: flex; gap: 8px; }
+    .btn {
+      flex: 1;
+      padding: 9px 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:hover  { opacity: 0.88; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: linear-gradient(135deg,#6d28d9,#4f46e5); color: #fff; }
+    .btn-danger  { background: #1f1f30; color: #f87171; border: 1px solid #3b1f1f; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Footer ── */
+    .footer {
+      border-top: 1px solid #1f1f30;
+      padding: 8px 16px;
+      font-size: 10px;
+      color: #4b5563;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🔍</div>
+  <div class="header-text">
+    <h1>Approach Scraper</h1>
+    <p>LinkedIn Email Harvester</p>
+  </div>
+  <div class="badge badge-idle" id="statusBadge">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusLabel">Idle</span>
+  </div>
+</div>
+
+<div class="body">
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Emails Stored</div>
+      <div class="stat-value" id="emailCount">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Run</div>
+      <div class="stat-value small" id="lastRun">Never</div>
+    </div>
+  </div>
+
+  <!-- Next alarm -->
+  <div class="alarm-bar">
+    <div class="alarm-icon">⏰</div>
+    <div class="alarm-text">
+      <strong>Next Auto-Scrape</strong>
+      <span id="nextAlarm">Loading…</span>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="btn btn-primary" id="btnRun">▶ Run Now</button>
+    <button class="btn btn-danger"  id="btnClear">🗑 Clear</button>
+  </div>
+
+</div>
+
+<div class="footer" id="footer">Auto-scrapes LinkedIn every 4 hours ✦ Syncs to Approach DB</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

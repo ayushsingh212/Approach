@@ -1,0 +1,13 @@
+{
+  "name": "approach-lead-gen-extension",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "watch": "tsc --project tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@types/chrome": "^0.0.268"
+  }
+}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { connectDB } from "@/src/lib/db";
 import Company from "@/src/models/CompanySchema";
 import { rateLimiter, rateLimitResponse } from "@/src/lib/rateLimiter";

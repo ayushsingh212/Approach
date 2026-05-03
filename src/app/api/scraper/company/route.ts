@@ -73,8 +73,22 @@ export async function POST(req: NextRequest) {
   const resolvedName = companyName?.trim() || "HR";
   const category = inferCategory(jobTitle, companyName);
 
-  // 5. Get admin user for addedBy
+  // 5. Connect + get admin user for addedBy
   await connectDB();
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // ── Explicit duplicate check BEFORE writing ──────────────────────────────
+  const existing = await Company.findOne({ email: normalizedEmail })
+    .select("_id")
+    .lean();
+
+  if (existing) {
+    return NextResponse.json(
+      { success: true, duplicate: true },
+      { status: 200, headers: CORS },
+    );
+  }
 
   const admin = await User.findOne({ role: "admin" }).select("_id").lean();
   if (!admin) {
@@ -86,7 +100,7 @@ export async function POST(req: NextRequest) {
 
   // 6. Build document — omit null optional fields
   const doc: Record<string, unknown> = {
-    email: email.trim().toLowerCase(),
+    email: normalizedEmail,
     name: resolvedName,
     category,
     addedBy: admin._id,
@@ -94,7 +108,7 @@ export async function POST(req: NextRequest) {
   if (location) doc.location = location.trim();
   if (website) doc.website = website.trim();
 
-  // 7. Insert
+  // 7. Insert (11000 catch is a safety net for race conditions)
   try {
     const created = await Company.create(doc);
     return NextResponse.json(
@@ -104,6 +118,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const mongoErr = err as { code?: number };
     if (mongoErr?.code === 11000) {
+      // Race condition — another request inserted the same email just now
       return NextResponse.json(
         { success: true, duplicate: true },
         { status: 200, headers: CORS },

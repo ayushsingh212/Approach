@@ -12,12 +12,15 @@ import { decrypt } from "@/src/lib/encrypt";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ["application/pdf"];
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_KEY!
-);
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  // Instantiate Supabase client at request time (not module load time)
+  const supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_KEY!
+  );
+
   try {
     // ─── SESSION CHECK ─────────────────────────────────────────────────────
     const session = await getServerSession(authOptions);
