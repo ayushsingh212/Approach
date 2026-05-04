@@ -37,7 +37,7 @@ function buildAttachmentsSection(
                             <span style="font-size: 24px;">📄</span>
                           </td>
                           <td style="vertical-align: middle;">
-                            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 15px; font-weight: 700; color: #1e293b; line-height: 1.2;">
+                            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 19px; font-weight: 700; color: #1e293b; line-height: 1.2;">
                               ${att.filename}
                             </span>
                             <br></br>
@@ -59,7 +59,7 @@ function buildAttachmentsSection(
                            text-decoration: none;
                            border-radius: 8px;
                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-                           font-size: 13px;
+                           font-size: 17px;
                            font-weight: 700;
                            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
                          ">
@@ -82,7 +82,7 @@ function buildAttachmentsSection(
       <td style="padding: 32px 0 8px 0;">
         <span style="
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-          font-size: 13px;
+          font-size: 15px;
           font-weight: 700;
           color: #64748b;
           text-transform: uppercase;
@@ -114,7 +114,7 @@ function buildFinalHtml(
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <title>Email</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+<body style="margin: 0; padding: 0; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 24px; line-height: 1.6; color: #0f172a;">
 
   <!-- Outer wrapper -->
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff;">
@@ -122,19 +122,26 @@ function buildFinalHtml(
       <td style="padding: 20px 0;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="width: 100%;">
           <tr>
-            <td style="padding: 0 20px;">
+            <td style="padding: 0 16px;">
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
 
                 <!-- Email body (Increased font size + Full Width) -->
                 <tr>
-                  <td>
+                  <td style="
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                    font-size: 26px;
+                    line-height: 1.6;
+                    color: #0f172a;
+                    mso-line-height-rule: exactly;
+                  ">
                     <div style="
-                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-                      font-size: 17px;
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                      font-size: 26px;
                       line-height: 1.6;
-                      color: #1e293b;
+                      color: #0f172a;
                       white-space: pre-wrap;
                       word-break: break-word;
+                      width: 100%;
                     ">${bodyText}</div>
                   </td>
                 </tr>
@@ -146,7 +153,7 @@ function buildFinalHtml(
                   <td style="padding-top: 40px; border-top: 1px solid #f1f5f9;">
                     <p style="
                       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-                      font-size: 12px;
+                      font-size: 15px;
                       color: #94a3b8;
                       margin: 0;
                     ">
