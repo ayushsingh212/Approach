@@ -1,5 +1,6 @@
 // ─── Approach Lead Gen Agent — Content Script ─────────────────────────────────
-// Handles: LinkedIn Jobs scraping, Google parsing, Company website crawling
+// Phase 1: Direct LinkedIn DOM scan for emails (fast — from reference scraper)
+// Phase 2: Google SERP parsing → company website → strict email crawl
 // TypeScript source. Compile: npm run build
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -11,6 +12,9 @@ interface ScrapedCompany {
 
 type IncomingMessage =
   | { type: "START_JOBS_SCRAPE"; duration: number }
+  | { type: "START_LINKEDIN_EMAIL_SCAN"; delay?: number }
+  | { type: "STOP_LINKEDIN_EMAIL_SCAN" }
+  | { type: "GET_SCAN_STATUS" }
   | { type: "EXTRACT_COMPANY_WEBSITE"; companyName: string }
   | { type: "CRAWL_WEBSITE_STRICT"; baseUrl: string };
 
@@ -20,14 +24,13 @@ const EMAIL_REGEX = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
 const OBFUSCATED_EMAIL_REGEX =
   /[a-zA-Z0-9._%+\-]+\s?\[at\]\s?[a-zA-Z0-9.\-]+\s?\[dot\]\s?[a-zA-Z]{2,}/gi;
 
-// Domains to reject in email validation
 const IGNORED_EMAIL_DOMAINS: string[] = [
   "example.com", "sentry.io", "wixpress.com", "amazonaws.com",
   "cloudfront.net", "linkedin.com", "google.com", "googlemail.com",
   "w3.org", "schema.org", "facebook.com", "twitter.com",
+  "2x.png", "sentry", "wixpress",
 ];
 
-// Domains to skip in Google results
 const PORTAL_DOMAINS: string[] = [
   "linkedin.com", "indeed.com", "naukri.com", "glassdoor.com",
   "simplyhired.com", "monster.com", "ziprecruiter.com", "facebook.com",
@@ -36,7 +39,6 @@ const PORTAL_DOMAINS: string[] = [
   "goodfirms.co", "ambitionbox.com", "internshala.com",
 ];
 
-// Priority sub-pages for email crawl
 const PRIORITY_PATHS: string[] = [
   "/contact", "/contact-us", "/about", "/about-us",
   "/careers", "/team", "/hire", "/reach-us", "/get-in-touch",
@@ -44,21 +46,18 @@ const PRIORITY_PATHS: string[] = [
 
 // ─── LinkedIn Jobs Page Selectors ─────────────────────────────────────────────
 
-// Scrollable left panel containing job cards
 const JOBS_LIST_SELECTOR = [
   ".jobs-search-results-list",
   ".scaffold-layout__list-container",
   ".jobs-search__results-list",
 ].join(", ");
 
-// Individual job card items
 const JOB_CARD_SELECTOR = [
   ".jobs-search-results__list-item",
   ".job-card-container",
   "li[data-occludable-job-id]",
 ].join(", ");
 
-// Company name inside a job card
 const COMPANY_NAME_SELECTORS = [
   ".job-card-container__company-name",
   ".artdeco-entity-lockup__subtitle span",
@@ -67,14 +66,154 @@ const COMPANY_NAME_SELECTORS = [
   ".base-search-card__subtitle",
 ];
 
-// Job title inside a card
 const JOB_TITLE_SELECTORS = [
   ".job-card-list__title",
   ".job-card-container__link span",
   ".base-card__full-link span",
 ];
 
-// ─── STEP 4: Extract Companies from LinkedIn Jobs Page ────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 1: DIRECT LINKEDIN DOM EMAIL SCAN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let scanning = false;
+let foundEmails = new Set<string>();
+let scrollInterval: ReturnType<typeof setInterval> | null = null;
+let domObserver: MutationObserver | null = null;
+let noNewContentCount = 0;
+let lastScrollY = -1;
+
+/** Filter out common false positives from regex matches */
+function filterEmailFalsePositives(emails: string[]): string[] {
+  return emails.filter((email) => {
+    const lower = email.toLowerCase();
+    return (
+      !lower.endsWith(".png") &&
+      !lower.endsWith(".jpg") &&
+      !lower.endsWith(".jpeg") &&
+      !lower.endsWith(".gif") &&
+      !lower.endsWith(".svg") &&
+      !lower.includes("sentry") &&
+      !lower.includes("example.com") &&
+      !lower.includes("wixpress") &&
+      !lower.includes("@2x") &&
+      !lower.includes("linkedin.com")
+    );
+  });
+}
+
+/** Scan visible DOM text for emails and send each new one to background */
+function scanLinkedInPage(): void {
+  const bodyText = document.body?.innerText ?? "";
+  const raw = bodyText.match(EMAIL_REGEX) ?? [];
+  const emails = filterEmailFalsePositives(raw);
+
+  emails.forEach((email) => {
+    const normalized = email.toLowerCase().trim();
+    if (!foundEmails.has(normalized)) {
+      foundEmails.add(normalized);
+      chrome.runtime.sendMessage({ type: "EMAIL_FOUND", email: normalized });
+    }
+  });
+}
+
+/** Click "see more" / "show more" buttons to expand hidden text */
+function expandLinkedInPosts(): void {
+  const selectors = [
+    "button.feed-shared-inline-show-more-text__see-more-less-toggle",
+    "button[aria-label='see more']",
+    ".see-more-less-html__button",
+    "button.inline-show-more-text__button",
+    "[data-control-name='see_more']",
+  ];
+  selectors.forEach((sel) => {
+    document.querySelectorAll<HTMLElement>(sel).forEach((btn) => {
+      try { btn.click(); } catch { /* ignore */ }
+    });
+  });
+}
+
+/** Start the scroll + scan loop on the current LinkedIn page */
+function startLinkedInEmailScan(scrollDelay = 2500): void {
+  if (scanning) return;
+  scanning = true;
+  foundEmails.clear();
+  noNewContentCount = 0;
+  lastScrollY = -1;
+
+  // Watch DOM mutations (new posts loading)
+  domObserver = new MutationObserver(() => {
+    expandLinkedInPosts();
+    scanLinkedInPage();
+  });
+  domObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+
+  // Initial pass
+  expandLinkedInPosts();
+  scanLinkedInPage();
+
+  // Scroll loop
+  scrollInterval = setInterval(() => {
+    if (!scanning) {
+      clearInterval(scrollInterval!);
+      return;
+    }
+
+    const currentY = window.scrollY;
+
+    if (Math.abs(currentY - lastScrollY) < 5 && lastScrollY !== -1) {
+      noNewContentCount++;
+      if (noNewContentCount >= 4) {
+        // Try "Load more" buttons
+        const loadMoreSelectors = [
+          "button.scaffold-finite-scroll__load-button",
+          "button[aria-label='Load more results']",
+          ".artdeco-pagination__button--next",
+          "button.see-more-jobs",
+        ];
+        let clicked = false;
+        for (const sel of loadMoreSelectors) {
+          const btn = document.querySelector<HTMLElement>(sel);
+          if (btn) {
+            btn.click();
+            clicked = true;
+            noNewContentCount = 0;
+            break;
+          }
+        }
+        if (!clicked && noNewContentCount >= 8) {
+          stopLinkedInEmailScan();
+          chrome.runtime.sendMessage({
+            type: "SCRAPE_DONE",
+            total: foundEmails.size,
+          });
+          return;
+        }
+      }
+    } else {
+      noNewContentCount = 0;
+    }
+
+    lastScrollY = currentY;
+    window.scrollBy({ top: 800, behavior: "smooth" });
+    expandLinkedInPosts();
+    scanLinkedInPage();
+  }, scrollDelay);
+}
+
+function stopLinkedInEmailScan(): void {
+  scanning = false;
+  if (scrollInterval) clearInterval(scrollInterval);
+  if (domObserver) domObserver.disconnect();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 2: LINKEDIN JOBS → COMPANIES (existing pipeline, kept intact)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function extractCompaniesFromJobCards(
   accumulator: Map<string, ScrapedCompany>
@@ -82,18 +221,13 @@ function extractCompaniesFromJobCards(
   const cards = document.querySelectorAll<HTMLElement>(JOB_CARD_SELECTOR);
 
   cards.forEach((card) => {
-    // Get company name
     let companyName = "";
     for (const sel of COMPANY_NAME_SELECTORS) {
       const el = card.querySelector<HTMLElement>(sel);
       const text = el?.textContent?.trim();
-      if (text && text.length > 1) {
-        companyName = text;
-        break;
-      }
+      if (text && text.length > 1) { companyName = text; break; }
     }
 
-    // Get job title
     let role = "";
     for (const sel of JOB_TITLE_SELECTORS) {
       const el = card.querySelector<HTMLElement>(sel);
@@ -102,19 +236,14 @@ function extractCompaniesFromJobCards(
     }
 
     if (!companyName) return;
-
     const key = companyName.toLowerCase().trim();
     if (!accumulator.has(key)) {
-      console.log(`[Approach Content] Found company: "${companyName}" — ${role}`);
       accumulator.set(key, { company_name: companyName, role });
     }
   });
 }
 
-// ─── STEP 2: Scroll Left Panel + Collect Companies ────────────────────────────
-
 function detectNextPage(): boolean {
-  // LinkedIn Jobs pagination: "Next" button at bottom of left panel
   const selectors = [
     "button[aria-label='View next page']",
     "button.jobs-search-pagination__button--next",
@@ -123,11 +252,8 @@ function detectNextPage(): boolean {
   ];
   for (const sel of selectors) {
     const btn = document.querySelector<HTMLElement>(sel);
-    if (btn && !btn.hasAttribute("disabled") && btn.offsetParent !== null) {
-      return true;
-    }
+    if (btn && !btn.hasAttribute("disabled") && btn.offsetParent !== null) return true;
   }
-  // Fallback: look for any visible element with text "Next"
   const allButtons = Array.from(document.querySelectorAll<HTMLElement>("button, a"));
   return allButtons.some(
     (el) =>
@@ -142,11 +268,9 @@ function startJobsScrape(duration: number): void {
   const INTERVAL_MS = 3000;
   let elapsed = 0;
 
-  // First pass immediately
   extractCompaniesFromJobCards(companies);
 
   const interval = setInterval(() => {
-    // Scroll the left panel (job list), not the whole window
     const listPanel = document.querySelector<HTMLElement>(JOBS_LIST_SELECTOR);
     if (listPanel) {
       listPanel.scrollBy({ top: 700, behavior: "smooth" });
@@ -154,17 +278,19 @@ function startJobsScrape(duration: number): void {
       window.scrollBy({ top: 700, behavior: "smooth" });
     }
 
-    // Extract after scroll to catch newly loaded cards
+    // Phase 1: Direct extraction (scans for emails in job descriptions/cards)
+    expandLinkedInPosts();
+    scanLinkedInPage();
+
+    // Phase 2: Company discovery
     extractCompaniesFromJobCards(companies);
+
     elapsed += INTERVAL_MS;
 
     if (elapsed >= duration) {
       clearInterval(interval);
       const results = Array.from(companies.values());
       const hasNextPage = detectNextPage();
-      console.log(
-        `[Approach Content] Jobs scrape done — ${results.length} companies | hasNextPage: ${hasNextPage}`
-      );
 
       chrome.runtime.sendMessage({
         type: "LINKEDIN_SCRAPE_DONE",
@@ -175,7 +301,7 @@ function startJobsScrape(duration: number): void {
   }, INTERVAL_MS);
 }
 
-// ─── STEP 5: Extract Company Website from Google Results ─────────────────────
+// ─── Google SERP → Company Website ───────────────────────────────────────────
 
 function extractCompanyWebsite(companyName: string): string | null {
   const companyTokens = companyName
@@ -183,36 +309,20 @@ function extractCompanyWebsite(companyName: string): string | null {
     .split(/\s+/)
     .filter((w) => w.length > 3);
 
-  // ── Strategy 1: Google <cite> elements show the real domain plainly ──────────────
-  // e.g. <cite>zenithbyteinnovations.com › contact</cite>
-  // These are NOT redirect URLs — they are the raw domains.
   const citeEls = Array.from(document.querySelectorAll<HTMLElement>("cite"));
   for (const cite of citeEls) {
     const raw = cite.textContent?.trim() ?? "";
-    // Take the part before any "›" breadcrumb
     const domainRaw = raw.split("›")[0].trim().split(" ")[0].trim();
     if (!domainRaw || !domainRaw.includes(".")) continue;
-
     const isPortal = PORTAL_DOMAINS.some((d) => domainRaw.includes(d));
     if (isPortal) continue;
-
-    const fullUrl = domainRaw.startsWith("http")
-      ? domainRaw
-      : `https://${domainRaw}`;
-
+    const fullUrl = domainRaw.startsWith("http") ? domainRaw : `https://${domainRaw}`;
     try {
       const parsed = new URL(fullUrl);
-      const domain = `${parsed.protocol}//${parsed.hostname}`;
-      console.log(`[Approach] ✔ cite strategy → ${domain}`);
-      return domain;
-    } catch {
-      continue;
-    }
+      return `${parsed.protocol}//${parsed.hostname}`;
+    } catch { continue; }
   }
 
-  // ── Strategy 2: Unwrap Google redirect URLs (/url?q=https://...) ─────────
-  // Google wraps result links like: https://www.google.com/url?q=https://company.com
-  // Our old code had `href.includes("google.") → skip` which blocked these!
   const searchArea =
     document.querySelector<HTMLElement>("#search, #rso") ?? document.body;
   const anchors = Array.from(
@@ -221,60 +331,40 @@ function extractCompanyWebsite(companyName: string): string | null {
 
   for (const anchor of anchors) {
     let resolvedHref = anchor.href;
-
-    // Unwrap Google's redirect format
     if (resolvedHref.includes("google.") && resolvedHref.includes("/url?")) {
       const match = resolvedHref.match(/[?&]q=([^&]+)/);
       if (match?.[1]) {
         const decoded = decodeURIComponent(match[1]);
-        if (decoded.startsWith("http")) {
-          resolvedHref = decoded; // now it's the real URL
-        } else {
-          continue;
-        }
-      } else {
-        continue;
-      }
+        if (decoded.startsWith("http")) { resolvedHref = decoded; }
+        else { continue; }
+      } else { continue; }
     }
-
-    // Skip all remaining Google-internal links
     if (resolvedHref.includes("google.")) continue;
     if (resolvedHref.includes("/search?")) continue;
     if (!resolvedHref.startsWith("http")) continue;
-
     const isPortal = PORTAL_DOMAINS.some((d) => resolvedHref.includes(d));
     if (isPortal) continue;
 
-    // Relevance: company name tokens should appear in URL or surrounding text
     const context = (
-      anchor.closest("div")?.textContent ??
-      anchor.textContent ??
-      ""
+      anchor.closest("div")?.textContent ?? anchor.textContent ?? ""
     ).toLowerCase();
-
     const isRelevant =
       companyTokens.length === 0 ||
       companyTokens.some(
-        (t) =>
-          resolvedHref.toLowerCase().includes(t) || context.includes(t)
+        (t) => resolvedHref.toLowerCase().includes(t) || context.includes(t)
       );
     if (!isRelevant) continue;
 
     try {
       const url = new URL(resolvedHref);
-      const domain = `${url.protocol}//${url.hostname}`;
-      console.log(`[Approach] ✔ redirect-unwrap strategy → ${domain}`);
-      return domain;
-    } catch {
-      continue;
-    }
+      return `${url.protocol}//${url.hostname}`;
+    } catch { continue; }
   }
 
-  console.warn(`[Approach] Could not find website for: ${companyName}`);
   return null;
 }
 
-// ─── STEP 7: Strict Email Extraction ─────────────────────────────────────────
+// ─── Website Strict Email Crawl ───────────────────────────────────────────────
 
 function isValidEmail(email: string, companyDomain?: string): boolean {
   const lower = email.toLowerCase();
@@ -289,39 +379,26 @@ function isValidEmail(email: string, companyDomain?: string): boolean {
 
 function extractEmailsStrict(text: string, companyDomain?: string): string[] {
   const emails: string[] = [];
-
-  // Standard regex
   (text.match(EMAIL_REGEX) ?? []).forEach((e) => emails.push(e));
-
-  // Obfuscated: name [at] domain [dot] com
   (text.match(OBFUSCATED_EMAIL_REGEX) ?? []).forEach((obs) => {
-    emails.push(
-      obs.replace(/\[at\]/gi, "@").replace(/\[dot\]/gi, ".").replace(/\s/g, "")
-    );
+    emails.push(obs.replace(/\[at\]/gi, "@").replace(/\[dot\]/gi, ".").replace(/\s/g, ""));
   });
-
   return Array.from(new Set(emails))
     .map((e) => e.toLowerCase().trim())
     .filter((e) => isValidEmail(e, companyDomain));
 }
 
-// ─── STEP 6+7: Website Crawl (Strict Mode) ────────────────────────────────────
-
 async function crawlWebsiteStrict(baseUrl: string): Promise<string[]> {
   let companyDomain = "";
   try {
     companyDomain = new URL(baseUrl).hostname.replace("www.", "");
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 
   const allEmails = new Set<string>();
 
-  // Layer 1a: Full body text
   const bodyText = document.body?.innerText ?? "";
   extractEmailsStrict(bodyText, companyDomain).forEach((e) => allEmails.add(e));
 
-  // Layer 1b: Mailto links (highest confidence)
   document
     .querySelectorAll<HTMLAnchorElement>("a[href^='mailto:']")
     .forEach((a) => {
@@ -329,7 +406,6 @@ async function crawlWebsiteStrict(baseUrl: string): Promise<string[]> {
       if (isValidEmail(email, companyDomain)) allEmails.add(email);
     });
 
-  // Layer 1c: Footer element
   const footer = document.querySelector<HTMLElement>(
     "footer, #footer, .footer, [class*='footer']"
   );
@@ -339,13 +415,8 @@ async function crawlWebsiteStrict(baseUrl: string): Promise<string[]> {
     );
   }
 
-  // If homepage already has emails → return immediately
-  if (allEmails.size > 0) {
-    console.log(`[Approach Content] Found ${allEmails.size} email(s) on homepage`);
-    return Array.from(allEmails);
-  }
+  if (allEmails.size > 0) return Array.from(allEmails);
 
-  // Layer 2: Crawl priority sub-pages (/contact, /about, /careers…)
   const pageLinks = Array.from(
     document.querySelectorAll<HTMLAnchorElement>("a[href]")
   )
@@ -355,13 +426,9 @@ async function crawlWebsiteStrict(baseUrl: string): Promise<string[]> {
         const url = new URL(href);
         return (
           url.hostname.includes(companyDomain) &&
-          PRIORITY_PATHS.some((p) =>
-            url.pathname.toLowerCase().includes(p.slice(1))
-          )
+          PRIORITY_PATHS.some((p) => url.pathname.toLowerCase().includes(p.slice(1)))
         );
-      } catch {
-        return false;
-      }
+      } catch { return false; }
     });
 
   const subPageUrls = Array.from(
@@ -378,17 +445,10 @@ async function crawlWebsiteStrict(baseUrl: string): Promise<string[]> {
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) continue;
-
       const html = await res.text();
       extractEmailsStrict(html, companyDomain).forEach((e) => allEmails.add(e));
-
-      if (allEmails.size > 0) {
-        console.log(`[Approach Content] Found email(s) on: ${subUrl}`);
-        break;
-      }
-    } catch {
-      // Network error — continue
-    }
+      if (allEmails.size > 0) break;
+    } catch { /* continue */ }
   }
 
   return Array.from(allEmails);
@@ -402,21 +462,46 @@ chrome.runtime.onMessage.addListener(
     _sender: chrome.runtime.MessageSender,
     sendResponse: (response: unknown) => void
   ): boolean => {
-    // STEP 2: Start LinkedIn Jobs scroll + company harvest
+
+    // ── PHASE 1: Direct LinkedIn email scan ───────────────────────────────────
+    if (message.type === "START_LINKEDIN_EMAIL_SCAN") {
+      if (!scanning) {
+        startLinkedInEmailScan(message.delay ?? 2500);
+        sendResponse({ status: "started" });
+      } else {
+        sendResponse({ status: "already_running" });
+      }
+      return false;
+    }
+
+    if (message.type === "STOP_LINKEDIN_EMAIL_SCAN") {
+      stopLinkedInEmailScan();
+      sendResponse({ status: "stopped", total: foundEmails.size });
+      return false;
+    }
+
+    if (message.type === "GET_SCAN_STATUS") {
+      sendResponse({
+        scanning,
+        total: foundEmails.size,
+        emails: Array.from(foundEmails),
+      });
+      return false;
+    }
+
+    // ── PHASE 2: Company pipeline ─────────────────────────────────────────────
     if (message.type === "START_JOBS_SCRAPE") {
       startJobsScrape(message.duration);
       sendResponse({ started: true });
-      return false; // LINKEDIN_SCRAPE_DONE fires later via runtime.sendMessage
+      return false;
     }
 
-    // STEP 5: Extract company website from Google SERP
     if (message.type === "EXTRACT_COMPANY_WEBSITE") {
       const domain = extractCompanyWebsite(message.companyName);
       sendResponse({ domain });
       return false;
     }
 
-    // STEP 6+7: Strict website crawl for real emails
     if (message.type === "CRAWL_WEBSITE_STRICT") {
       crawlWebsiteStrict(message.baseUrl).then((emails) => {
         sendResponse({ emails });

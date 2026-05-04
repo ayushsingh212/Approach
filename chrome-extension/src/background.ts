@@ -22,12 +22,12 @@ const LINKEDIN_QUERIES: string[] = [
 ];
 
 // STEP 2: Scroll duration — 5 minutes per page (PRODUCTION)
-const SCROLL_DURATION_MS: number = 5 * 60 * 1000;
-const MAX_PAGES_PER_QUERY: number = 4; // up to 4 pages × 5 min = 20 min per query
+const SCROLL_DURATION_MS: number = 2.5 * 60 * 1000; // 2.5 minutes per page (Requested)
+const MAX_PAGES_PER_QUERY: number = 8; // Covers more of "last month" (Requested)
 
 // Alarm config — every 12 hours
 const ALARM_NAME: string    = "lead-gen-alarm";
-const ALARM_MINUTES: number = 720; // 12 hours
+const ALARM_MINUTES: number = 240; // 4 hours (Requested)
 
 const TAB_LOAD_DELAY_MS: number    = 4000;
 const BETWEEN_ACTIONS_DELAY: number = 3000;
@@ -430,15 +430,22 @@ chrome.alarms.onAlarm.addListener((alarm: chrome.alarms.Alarm): void => {
   if (alarm.name === ALARM_NAME) runSession();
 });
 
+// ─── Phase 1: Direct Scan — in-memory email store (relay from content script) ─
+
+let directScanEmails = new Set<string>();
+let directScanActive = false;
+
 // ─── Popup Message Listener ───────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener(
   (
-    message: { type: string },
+    message: { type: string; [key: string]: unknown },
     _sender: chrome.runtime.MessageSender,
     sendResponse: (response: unknown) => void
   ): boolean => {
     switch (message.type) {
+
+      // ── Phase 2 pipeline ──────────────────────────────────────────────────
       case "RUN_MANUAL":
         sendResponse({ started: true });
         runSession();
@@ -470,6 +477,57 @@ chrome.runtime.onMessage.addListener(
           .set({ emailStore: {}, companyQueue: [] })
           .then(() => sendResponse({ success: true }));
         return true;
+
+      // ── Phase 1: Direct LinkedIn scan relay ───────────────────────────────
+      case "EMAIL_FOUND": {
+        const email = (message.email as string)?.toLowerCase().trim();
+        if (email && !directScanEmails.has(email)) {
+          directScanEmails.add(email);
+          
+          // Auto-sync found emails to backend (Requested: Phase 1 sync)
+          const lead: Lead = {
+            email,
+            company_name: "LinkedIn Lead", // Placeholder for direct extraction
+            website: "https://www.linkedin.com",
+          };
+          syncLead(lead);
+
+          // Relay to popup if open
+          chrome.runtime.sendMessage({
+            type: "EMAIL_UPDATE",
+            email,
+            total: directScanEmails.size,
+          }).catch(() => {}); // popup may be closed
+        }
+        return false;
+      }
+
+      case "SCRAPE_DONE":
+        directScanActive = false;
+        chrome.runtime.sendMessage({
+          type: "SCRAPE_COMPLETE",
+          total: directScanEmails.size,
+          emails: Array.from(directScanEmails),
+        }).catch(() => {});
+        return false;
+
+      case "GET_ALL_EMAILS":
+        sendResponse({
+          emails: Array.from(directScanEmails),
+          total: directScanEmails.size,
+          scraping: directScanActive,
+        });
+        return false;
+
+      case "CLEAR_EMAILS":
+        directScanEmails.clear();
+        directScanActive = false;
+        sendResponse({ status: "cleared" });
+        return false;
+
+      case "SET_SCRAPING":
+        directScanActive = message.value as boolean;
+        return false;
 
       default:
         sendResponse({});

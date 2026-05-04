@@ -1,100 +1,248 @@
-// ─── Approach Lead Gen Agent — Popup Controller ───────────────────────────────
+// popup.js — Two-tab popup for Approach Scraper
+// Tab 1: Quick Scan (direct LinkedIn DOM scan)
+// Tab 2: Auto Pipeline (12h LinkedIn Jobs → Google → Website → DB)
 
-const btnRun      = document.getElementById('btnRun');
-const btnClear    = document.getElementById('btnClear');
-const emailCountEl= document.getElementById('emailCount');
-const lastRunEl   = document.getElementById('lastRun');
-const nextAlarmEl = document.getElementById('nextAlarm');
-const statusBadge = document.getElementById('statusBadge');
-const statusDot   = document.getElementById('statusDot');
-const statusLabel = document.getElementById('statusLabel');
-const footer      = document.getElementById('footer');
+// ─── Shared state ─────────────────────────────────────────────────────────────
+let currentTabId = null;
+let isLinkedIn = false;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Tab switching ────────────────────────────────────────────────────────────
+document.getElementById('tabQuick').addEventListener('click', () => switchTab('Quick'));
+document.getElementById('tabPipeline').addEventListener('click', () => switchTab('Pipeline'));
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab${name}`).classList.add('active');
+  document.getElementById(`panel${name}`).classList.add('active');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  currentTabId = tab?.id ?? null;
+  isLinkedIn = !!(tab?.url && tab.url.includes('linkedin.com'));
+
+  // ── Quick Scan tab init ────────────────────────────────────────────────────
+  if (!isLinkedIn) {
+    document.getElementById('notLinkedin').style.display = 'block';
+    document.getElementById('mainUI').style.display = 'none';
+  } else {
+    document.getElementById('notLinkedin').style.display = 'none';
+    document.getElementById('mainUI').style.display = 'block';
+
+    // Load stored emails from background
+    chrome.runtime.sendMessage({ type: 'GET_ALL_EMAILS' }, (res) => {
+      if (res) {
+        quickEmails = res.emails || [];
+        quickScraping = res.scraping || false;
+        updateScanCounter();
+        renderEmails();
+        if (quickScraping) setQuickUI(true);
+      }
+    });
+  }
+
+  // ── Auto Pipeline tab init ─────────────────────────────────────────────────
+  chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (res) => {
+    if (!res) return;
+    document.getElementById('emailCount').textContent = res.emailCount ?? '—';
+    document.getElementById('lastRun').textContent = res.lastAutoScrapeAt
+      ? formatRelative(res.lastAutoScrapeAt)
+      : 'Never';
+    document.getElementById('nextAlarm').textContent = res.nextAlarmAt
+      ? formatRelative(res.nextAlarmAt)
+      : 'Not scheduled';
+    setGlobalBadge(res.isRunning);
+  });
+
+  // ── Speed buttons ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedDelay = parseInt(btn.dataset.delay);
+      document.getElementById('warningMsg').classList.toggle('show', selectedDelay < 1500);
+    });
+  });
+
+  // ── Quick Scan buttons ─────────────────────────────────────────────────────
+  document.getElementById('btnStart').addEventListener('click', startQuickScan);
+  document.getElementById('btnStop').addEventListener('click', stopQuickScan);
+  document.getElementById('btnExport').addEventListener('click', exportCSV);
+  document.getElementById('btnClear').addEventListener('click', clearQuickEmails);
+
+  // ── Pipeline buttons ───────────────────────────────────────────────────────
+  document.getElementById('btnRun').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'RUN_MANUAL' });
+    setGlobalBadge(true);
+    document.getElementById('btnRun').disabled = true;
+    document.getElementById('btnRun').textContent = '⏳ Running…';
+  });
+
+  document.getElementById('btnClearPipeline').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'CLEAR_DATA' }, () => {
+      document.getElementById('emailCount').textContent = '0';
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// QUICK SCAN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let quickEmails = [];
+let quickScraping = false;
+let selectedDelay = 2500;
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'EMAIL_UPDATE') {
+    if (!quickEmails.includes(message.email)) {
+      quickEmails.push(message.email);
+      updateScanCounter();
+      addEmailToList(message.email);
+    }
+  }
+  if (message.type === 'SCRAPE_COMPLETE') {
+    quickScraping = false;
+    setQuickUI(false);
+    quickEmails = message.emails || quickEmails;
+    updateScanCounter();
+    renderEmails();
+    document.getElementById('scanStatusText').textContent = `Done — ${quickEmails.length} emails found`;
+  }
+});
+
+async function startQuickScan() {
+  if (!currentTabId || !isLinkedIn) return;
+
+  quickScraping = true;
+  setQuickUI(true);
+  document.getElementById('scanStatusText').textContent = 'Scanning…';
+  chrome.runtime.sendMessage({ type: 'SET_SCRAPING', value: true });
+
+  // Inject content script (safe to call even if already injected)
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: currentTabId },
+      files: ['dist/content.js'],
+    });
+  } catch (e) { /* already injected */ }
+
+  chrome.tabs.sendMessage(currentTabId, {
+    type: 'START_LINKEDIN_EMAIL_SCAN',
+    delay: selectedDelay,
+  }, (res) => {
+    if (chrome.runtime.lastError) {
+      console.error('[Approach Popup] Content script error:', chrome.runtime.lastError.message);
+      setQuickUI(false);
+    }
+  });
+}
+
+function stopQuickScan() {
+  if (!currentTabId) return;
+  quickScraping = false;
+  setQuickUI(false);
+  chrome.runtime.sendMessage({ type: 'SET_SCRAPING', value: false });
+  chrome.tabs.sendMessage(currentTabId, { type: 'STOP_LINKEDIN_EMAIL_SCAN' });
+  document.getElementById('scanStatusText').textContent = `Stopped — ${quickEmails.length} emails`;
+}
+
+function clearQuickEmails() {
+  quickEmails = [];
+  chrome.runtime.sendMessage({ type: 'CLEAR_EMAILS' });
+  updateScanCounter();
+  renderEmails();
+  document.getElementById('scanStatusText').textContent = 'Ready to scan';
+}
+
+function exportCSV() {
+  if (quickEmails.length === 0) return;
+  const csvContent = 'Email\n' + quickEmails.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `linkedin_emails_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+function setQuickUI(active) {
+  document.getElementById('btnStart').disabled = active;
+  document.getElementById('btnStop').disabled = !active;
+  setGlobalBadge(active);
+}
+
+function setGlobalBadge(active) {
+  const badge = document.getElementById('statusBadge');
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('statusLabel');
+  badge.className = `badge ${active ? 'badge-running' : 'badge-idle'}`;
+  dot.className = `dot ${active ? 'pulse' : ''}`;
+  label.textContent = active ? 'Running' : 'Idle';
+}
+
+function updateScanCounter() {
+  document.getElementById('scanCounter').textContent = quickEmails.length;
+  document.getElementById('btnExport').disabled = quickEmails.length === 0;
+}
+
+function renderEmails() {
+  const list = document.getElementById('emailList');
+  if (quickEmails.length === 0) {
+    list.innerHTML = '<div class="empty-state">No emails yet.<br/>Press Start Scan to begin.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  [...quickEmails].reverse().forEach(email => {
+    list.appendChild(createEmailItem(email));
+  });
+}
+
+function addEmailToList(email) {
+  const list = document.getElementById('emailList');
+  const emptyState = list.querySelector('.empty-state');
+  if (emptyState) emptyState.remove();
+  list.insertBefore(createEmailItem(email), list.firstChild);
+}
+
+function createEmailItem(email) {
+  const item = document.createElement('div');
+  item.className = 'email-item';
+  item.innerHTML = `
+    <div class="email-dot"></div>
+    <span class="email-text" title="${email}">${email}</span>
+    <button class="email-copy" title="Copy">⎘</button>
+  `;
+  item.querySelector('.email-copy').addEventListener('click', () => {
+    navigator.clipboard.writeText(email).then(() => {
+      item.querySelector('.email-copy').textContent = '✓';
+      setTimeout(() => { item.querySelector('.email-copy').textContent = '⎘'; }, 1000);
+    });
+  });
+  return item;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHARED UTILS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function formatRelative(isoString) {
-  if (!isoString) return 'Never';
-  const diff = Date.now() - new Date(isoString).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  return hrs < 24 ? `${hrs}h ago` : `${Math.floor(hrs / 24)}d ago`;
-}
-
-function formatCountdown(isoString) {
-  if (!isoString) return 'Not scheduled';
-  const diff = new Date(isoString).getTime() - Date.now();
-  if (diff <= 0) return 'Imminent';
-  const totalMins = Math.floor(diff / 60_000);
-  const hrs = Math.floor(totalMins / 60);
-  const mins = totalMins % 60;
-  return hrs > 0 ? `in ${hrs}h ${mins}m` : `in ${mins}m`;
-}
-
-function setRunning(running) {
-  if (running) {
-    statusBadge.className = 'badge badge-running';
-    statusDot.classList.add('pulse');
-    statusLabel.textContent = 'Running…';
-    btnRun.disabled = true;
-    btnRun.textContent = '⏳ Running…';
-  } else {
-    statusBadge.className = 'badge badge-idle';
-    statusDot.classList.remove('pulse');
-    statusLabel.textContent = 'Idle';
-    btnRun.disabled = false;
-    btnRun.textContent = '▶ Run Now';
+  try {
+    const diff = new Date(isoString) - Date.now();
+    const abs = Math.abs(diff);
+    const mins = Math.round(abs / 60000);
+    const hrs  = Math.round(abs / 3600000);
+    if (abs < 60000)   return diff > 0 ? 'in < 1 min' : 'just now';
+    if (abs < 3600000) return diff > 0 ? `in ${mins}m` : `${mins}m ago`;
+    return diff > 0 ? `in ${hrs}h` : `${hrs}h ago`;
+  } catch {
+    return isoString;
   }
 }
-
-function showFooter(msg) {
-  footer.textContent = msg;
-  footer.style.color = '#6ee7b7';
-  setTimeout(() => {
-    footer.textContent = 'Discovers tech companies via Google • Extracts emails • Syncs to DB';
-    footer.style.color = '';
-  }, 3000);
-}
-
-// ─── Status Refresh ───────────────────────────────────────────────────────────
-
-function refreshStatus() {
-  chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (res) => {
-    if (chrome.runtime.lastError || !res) {
-      statusLabel.textContent = 'Error — reload extension';
-      return;
-    }
-    emailCountEl.textContent = res.emailCount ?? 0;
-    lastRunEl.textContent    = formatRelative(res.lastAutoScrapeAt);
-    nextAlarmEl.textContent  = formatCountdown(res.nextAlarmAt);
-    setRunning(res.isRunning);
-  });
-}
-
-refreshStatus();
-setInterval(refreshStatus, 5000);
-
-// ─── Buttons ──────────────────────────────────────────────────────────────────
-
-btnRun.addEventListener('click', () => {
-  // ✅ FIXED: now sends RUN_MANUAL to match the new background.js
-  chrome.runtime.sendMessage({ type: 'RUN_MANUAL' }, (res) => {
-    if (chrome.runtime.lastError) {
-      showFooter('❌ Error — try reloading extension');
-      return;
-    }
-    if (res?.started) {
-      setRunning(true);
-      showFooter('✔ Session started — searching Google for tech companies…');
-    }
-  });
-});
-
-btnClear.addEventListener('click', () => {
-  if (!confirm('Clear all locally stored emails?')) return;
-  chrome.storage.local.set({ emailStore: {}, crawlQueue: [] }, () => {
-    emailCountEl.textContent = '0';
-    showFooter('✔ Store cleared.');
-  });
-});
