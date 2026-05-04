@@ -14,6 +14,10 @@ import {
   Send,
   CheckSquare,
   Square,
+  Loader2,
+  MailCheck,
+  MailX,
+  ChevronDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useDebounce } from "@/src/Hooks/useDebounce";
@@ -65,6 +69,14 @@ export default function HomePage() {
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showCompanyPanel, setShowCompanyPanel] = useState(false);
 
+  // ── Streaming progress state ────────────────────────────────────────────────
+  const [streamTotal, setStreamTotal] = useState(0);
+  const [streamResults, setStreamResults] = useState<any[]>([]);
+  const [streamDone, setStreamDone] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
+  const [showSelectDropdown, setShowSelectDropdown] = useState(false);
+  const selectDropdownRef = useRef<HTMLDivElement>(null);
+
   // ── Infinite-scroll state ───────────────────────────────────────────────────
   const [isFirstLoad, setIsFirstLoad] = useState(true);   // skeleton on page 1
   const [isLoadingMore, setIsLoadingMore] = useState(false); // spinner on page 2+
@@ -91,7 +103,19 @@ export default function HomePage() {
   useEffect(() => {
     const handler = (e: PromiseRejectionEvent) => { e.preventDefault(); };
     window.addEventListener("unhandledrejection", handler);
-    return () => window.removeEventListener("unhandledrejection", handler);
+    
+    // Close dropdown on click outside
+    const handleClickOutside = (event: MouseEvent) => {
+      if (selectDropdownRef.current && !selectDropdownRef.current.contains(event.target as Node)) {
+        setShowSelectDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("unhandledrejection", handler);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   // ── Core page fetcher ───────────────────────────────────────────────────────
@@ -191,51 +215,109 @@ export default function HomePage() {
       const toAdd = companySearchResults.filter((c) => !existingIds.has(c._id));
       store.setSelectedCompanies([...selectedCompanies, ...toAdd]);
     }
+    setShowSelectDropdown(false);
   };
 
-  // ── Send ────────────────────────────────────────────────────────────────────
+  const handleSelectNonSent = () => {
+    const existingIds = new Set(selectedCompanies.map((c) => c._id));
+    const toAdd = companySearchResults.filter(
+      (c) => !sentSet.has(String(c._id)) && !existingIds.has(c._id)
+    );
+    store.setSelectedCompanies([...selectedCompanies, ...toAdd]);
+    setShowSelectDropdown(false);
+    if (toAdd.length === 0) {
+      toast.error("No non-sent companies in current list");
+    } else {
+      toast.success(`Selected ${toAdd.length} non-sent companies`);
+    }
+  };
+
+  // ── Send (streaming) ────────────────────────────────────────────────────────
   const handleSend = useThrottle(async () => {
     if (!subject.trim())               { toast.error("Please enter an email subject"); return; }
     if (!emailBody.trim())             { toast.error("Please write an email body"); return; }
     if (selectedCompanies.length === 0){ toast.error("Please select at least one company"); return; }
 
     clearState();
+    // Reset progress state
+    setStreamResults([]);
+    setStreamTotal(0);
+    setStreamDone(false);
+    setShowProgress(true);
     store.setIsSending(true);
-    const toastId = toast.loading("Sending emails...");
+
+    const formData = new FormData();
+    formData.append("subject",   subject.trim());
+    formData.append("emailBody", emailBody.trim());
+    selectedCompanies.forEach((c) => formData.append("companyIds", c._id));
+    attachments.forEach((f) => formData.append("attachments", f));
 
     try {
-      const formData = new FormData();
-      formData.append("subject",   subject.trim());
-      formData.append("emailBody", emailBody.trim());
-      selectedCompanies.forEach((c) => formData.append("companyIds", c._id));
-      attachments.forEach((f) => formData.append("attachments", f));
+      const response = await fetch("/api/email/send-with-supabase", {
+        method: "POST",
+        body: formData,
+      });
 
-      const res = await emailService.sendEmailWithAttachments(formData);
-      store.setSendResult(res);
+      if (!response.ok || !response.body) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || "Failed to send emails");
+      }
 
-      // ── Optimistically mark every successfully-sent company ──────────────
-      const sentCompanyIds = (res?.deliveryResults ?? [])
-        .filter((r: any) => r.status === "sent")
-        .map((r: any) => String(r.company));
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      // Fallback: if deliveryResults is empty, mark all selected
-      const idsToMark =
-        sentCompanyIds.length > 0
-          ? sentCompanyIds
-          : selectedCompanies.map((c) => String(c._id));
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      idsToMark.forEach((id: string) => markAsSent(id));
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? ""; // keep incomplete line in buffer
 
-      store.clearCompose();
-      setAttachments([]);
-      toast.success(
-        `Sent to ${res?.summary?.totalSent ?? selectedCompanies.length} company(ies)!`,
-        { id: toastId },
-      );
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+
+            if (event.type === "start") {
+              setStreamTotal(event.total);
+            }
+
+            if (event.type === "result") {
+              setStreamResults((prev) => [...prev, event.data]);
+              if (event.data.status === "sent") {
+                markAsSent(String(event.data.company));
+              }
+            }
+
+            if (event.type === "done") {
+              setStreamDone(true);
+              store.setSendResult({
+                success: true,
+                summary: event.summary,
+                deliveryResults: event.deliveryResults,
+              });
+              store.clearCompose();
+              setAttachments([]);
+              toast.success(
+                `Sent to ${event.summary.totalSent} / ${event.summary.totalTargeted} company(ies)!`
+              );
+            }
+
+            if (event.type === "error") {
+              throw new Error(event.message);
+            }
+          } catch (parseErr) {
+            // skip malformed lines
+          }
+        }
+      }
     } catch (err: any) {
       const msg = err.message || "Failed to send emails";
       store.setSendError(msg);
-      toast.error(msg, { id: toastId });
+      toast.error(msg);
+      setShowProgress(false);
     } finally {
       store.setIsSending(false);
     }
@@ -360,24 +442,43 @@ export default function HomePage() {
                   ? ` / ${companySearchPagination.total} total`
                   : ""}
               </span>
-              <button
-                onClick={handleSelectAll}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                  border transition-all ${
-                    allCurrentSelected
-                      ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-amber-400 hover:text-amber-700"
-                  }`}
-              >
-                {allCurrentSelected
-                  ? <><CheckSquare size={13} /> Deselect All</>
-                  : <><Square size={13} /> Select All</>
-                }
-              </button>
+              
+              <div className="relative" ref={selectDropdownRef}>
+                <button
+                  onClick={() => setShowSelectDropdown(!showSelectDropdown)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                    border transition-all ${
+                      allCurrentSelected
+                        ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-amber-400 hover:text-amber-700"
+                    }`}
+                >
+                  {allCurrentSelected ? <CheckSquare size={13} /> : <Square size={13} />}
+                  Select
+                  <ChevronDown size={12} className="ml-0.5 opacity-60" />
+                </button>
+
+                {showSelectDropdown && (
+                  <div className="absolute right-0 mt-2 w-32 bg-white border border-slate-200 rounded-xl shadow-xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                    <button
+                      onClick={handleSelectAll}
+                      className="w-full text-left px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700 border-b border-slate-50"
+                    >
+                      {allCurrentSelected ? "Deselect All" : "All"}
+                    </button>
+                    <button
+                      onClick={handleSelectNonSent}
+                      className="w-full text-left px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700"
+                    >
+                      Non-Sent
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {/* ── Company list ──────────────────────────────────────────────────── */}
+          {/* ── Company list (Sorted: Non-sent first) ─────────────────────────── */}
           <div className="space-y-2">
             {isFirstLoad ? (
               // Skeleton on initial / filter-reset load
@@ -394,46 +495,53 @@ export default function HomePage() {
               </div>
             ) : (
               <>
-                {companySearchResults.map((c) => {
-                  const selected = selectedCompanies.some((sc) => sc._id === c._id);
-                  const alreadySent = sentSet.has(String(c._id));
-                  return (
-                    <div
-                      key={c._id}
-                      onClick={() => {
-                        selected
-                          ? store.removeSelectedCompany(c._id)
-                          : store.addSelectedCompany(c);
-                      }}
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                        selected
-                          ? "bg-amber-50 border-amber-400 shadow-sm"
-                          : "bg-white border-slate-200 hover:border-amber-300 hover:bg-amber-50/30"
-                      }`}
-                    >
-                      {/* Name row + Already Sent badge */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="font-medium text-slate-800 text-sm truncate">
-                          {c.name}
+                {[...companySearchResults]
+                  .sort((a, b) => {
+                    const aSent = sentSet.has(String(a._id));
+                    const bSent = sentSet.has(String(b._id));
+                    if (aSent && !bSent) return 1;
+                    if (!aSent && bSent) return -1;
+                    return 0;
+                  })
+                  .map((c) => {
+                    const selected = selectedCompanies.some((sc) => sc._id === c._id);
+                    const alreadySent = sentSet.has(String(c._id));
+                    return (
+                      <div
+                        key={c._id}
+                        onClick={() => {
+                          selected
+                            ? store.removeSelectedCompany(c._id)
+                            : store.addSelectedCompany(c);
+                        }}
+                        className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                          selected
+                            ? "bg-amber-50 border-amber-400 shadow-sm"
+                            : "bg-white border-slate-200 hover:border-amber-300 hover:bg-amber-50/30"
+                        }`}
+                      >
+                        {/* Name row + Already Sent badge */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className={`font-medium text-sm truncate ${alreadySent ? "text-slate-400" : "text-slate-800"}`}>
+                            {c.name}
+                          </div>
+                          {alreadySent && (
+                            <span
+                              className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5
+                                rounded-full text-[10px] font-semibold
+                                bg-emerald-50 text-emerald-600 border border-emerald-200"
+                            >
+                              <CheckCircle size={9} />
+                              Sent
+                            </span>
+                          )}
                         </div>
-                        {alreadySent && (
-                          <span
-                            className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5
-                              rounded-full text-[10px] font-semibold
-                              bg-emerald-50 text-emerald-600 border border-emerald-200"
-                          >
-                            <CheckCircle size={9} />
-                            Sent
-                          </span>
-                        )}
+                        <div className="text-xs text-slate-400 mt-0.5 truncate">
+                          {Array.isArray(c.category) ? c.category.join(", ") : c.category}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-400 mt-0.5 truncate">
-                        {Array.isArray(c.category) ? c.category.join(", ") : c.category}
-                      </div>
-                    </div>
-                  );
-
-                })}
+                    );
+                  })}
 
                 {/* Sentinel: triggers next page load when visible */}
                 <div ref={sentinelRef} className="h-4" aria-hidden="true" />
@@ -525,8 +633,57 @@ export default function HomePage() {
             )}
           </div>
 
+          {/* ── Live Streaming Progress Panel (Simplified Bar + Percentage) ── */}
+          {showProgress && (
+            <div className="mb-6 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  {!streamDone ? (
+                    <div className="relative flex items-center justify-center">
+                      <Loader2 size={18} className="animate-spin text-amber-500" />
+                    </div>
+                  ) : (
+                    <CheckCircle size={18} className="text-emerald-500" />
+                  )}
+                  <span className="text-sm font-bold text-slate-800">
+                    {streamDone ? "Sending Complete" : "Sending Emails..."}
+                  </span>
+                </div>
+                <span className="text-sm font-black text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                  {streamTotal > 0 
+                    ? `${Math.round((streamResults.length / streamTotal) * 100)}%` 
+                    : "0%"}
+                </span>
+              </div>
+
+              {/* Progress bar container */}
+              <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-700 ease-out rounded-full ${
+                    streamDone ? "bg-emerald-500" : "bg-gradient-to-r from-amber-400 to-amber-500"
+                  }`}
+                  style={{ width: `${streamTotal > 0 ? (streamResults.length / streamTotal) * 100 : 0}%` }}
+                />
+              </div>
+
+              <div className="flex justify-between mt-3 text-[11px] font-medium text-slate-400 uppercase tracking-widest">
+                <span>{streamResults.length} Processed</span>
+                <span>{streamTotal} Total</span>
+              </div>
+
+              {streamDone && (
+                <button
+                  onClick={() => setShowProgress(false)}
+                  className="w-full mt-5 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-100 rounded-xl transition-all"
+                >
+                  Dismiss Progress
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Alerts */}
-          {sendResult && (
+          {!showProgress && sendResult && (
             <div
               onClick={clearState}
               className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl
@@ -537,8 +694,8 @@ export default function HomePage() {
                 <p className="font-medium text-green-900 text-sm">Emails sent successfully!</p>
                 <p className="text-xs text-green-700 mt-0.5">
                   {sendResult?.summary?.totalSent ?? 0} sent
-                  {sendResult?.summary?.totalFailed > 0 && (
-                    <span className="text-orange-600"> · {sendResult.summary.totalFailed} failed</span>
+                  {(sendResult?.summary?.totalFailed ?? 0) > 0 && (
+                    <span className="text-orange-600"> · {sendResult?.summary?.totalFailed} failed</span>
                   )}
                 </p>
               </div>

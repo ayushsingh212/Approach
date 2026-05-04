@@ -153,7 +153,7 @@ export default function HistoryPage() {
                                 <span className="text-slate-300 text-xs">·</span>
                                 <span className="flex items-center gap-1 text-xs text-slate-400">
                                   <Paperclip size={10} />
-                                  {log.attachmentUrls.length}
+                                  {log.attachmentUrls?.length}
                                 </span>
                               </>
                             )}

@@ -212,9 +212,26 @@ export default function AIImportPage() {
 
   const [saveResult, setSaveResult] = useState<SaveResponse | null>(null);
 
-  // ── Parse with Gemini ───────────────────────────────────────────────────────
+  // ── Batch progress state ─────────────────────────────────────────────────────
+  const [batchCurrent, setBatchCurrent] = useState(0);
+  const [batchTotal, setBatchTotal] = useState(0);
+
+  const BATCH_SIZE = 10;
+
+  // ── Parse with AI — batched 10 lines at a time ─────────────────────────────
   const handleParse = useCallback(async () => {
     if (!rawInput.trim()) return;
+
+    // Split into non-empty lines and chunk into groups of BATCH_SIZE
+    const lines = rawInput
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const batches: string[][] = [];
+    for (let i = 0; i < lines.length; i += BATCH_SIZE) {
+      batches.push(lines.slice(i, i + BATCH_SIZE));
+    }
 
     setIsParsing(true);
     setParseError(null);
@@ -222,40 +239,49 @@ export default function AIImportPage() {
     setSkippedDismissed(false);
     setSaveResult(null);
     dispatch({ type: "CLEAR" });
+    setBatchCurrent(0);
+    setBatchTotal(batches.length);
 
-    try {
-      const res = await fetch("/api/admin/ai-import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawInput }),
-      });
+    const allRecords: ParsedRecord[] = [];
+    const allSkipped: SkippedRecord[] = [];
 
-      const data: ParseResponse & { error?: string } = await res.json();
+    for (let i = 0; i < batches.length; i++) {
+      setBatchCurrent(i + 1);
+      const batchText = batches[i].join("\n");
 
-      if (!res.ok) {
-        // Rate limited — surface the exact message
-        if (res.status === 429) {
-          setParseError(
-            "Too many requests. Wait a moment before parsing again.",
-          );
-          return;
+      try {
+        const res = await fetch("/api/admin/ai-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rawInput: batchText }),
+        });
+
+        const data: ParseResponse & { error?: string } = await res.json();
+
+        if (!res.ok) {
+          if (res.status === 429) {
+            setParseError(`Rate limited on batch ${i + 1}/${batches.length}. Wait a moment and try again.`);
+            break;
+          }
+          setParseError(data.error ?? `AI parsing failed on batch ${i + 1} (HTTP ${res.status})`);
+          break;
         }
-        setParseError(
-          data.error ??
-            `AI parsing failed (HTTP ${res.status}). Check your GEMINI_API_KEY in .env.local`,
-        );
-        return;
-      }
 
-      dispatch({ type: "SET_ROWS", rows: toRows(data.records) });
-      setSkipped(data.skipped ?? []);
-    } catch (err) {
-      setParseError(
-        `AI parsing failed: ${err instanceof Error ? err.message : "Network error"}. Check your GEMINI_API_KEY in .env.local`,
-      );
-    } finally {
-      setIsParsing(false);
+        allRecords.push(...(data.records ?? []));
+        allSkipped.push(...(data.skipped ?? []));
+      } catch (err) {
+        setParseError(
+          `Network error on batch ${i + 1}: ${err instanceof Error ? err.message : "Unknown error"}`
+        );
+        break;
+      }
     }
+
+    dispatch({ type: "SET_ROWS", rows: toRows(allRecords) });
+    setSkipped(allSkipped);
+    setIsParsing(false);
+    setBatchCurrent(0);
+    setBatchTotal(0);
   }, [rawInput]);
 
   // ── Save to DB ──────────────────────────────────────────────────────────────
@@ -415,6 +441,30 @@ export default function AIImportPage() {
                 leading-relaxed"
             />
 
+            {/* ── Batch progress bar ──────────────────────────── */}
+            {isParsing && batchTotal > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin text-amber-500" />
+                    Processing batch {batchCurrent} of {batchTotal}…
+                  </span>
+                  <span className="font-semibold text-amber-600">
+                    {Math.round((batchCurrent / batchTotal) * 100)}%
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-2 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full transition-all duration-500"
+                    style={{ width: `${(batchCurrent / batchTotal) * 100}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 text-center">
+                  Each batch sends 10 emails to AI — please wait
+                </p>
+              </div>
+            )}
+
             <button
               id="parse-ai-btn"
               onClick={handleParse}
@@ -427,7 +477,9 @@ export default function AIImportPage() {
               {isParsing ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Gemini is parsing your data…
+                  {batchTotal > 0
+                    ? `Batch ${batchCurrent}/${batchTotal} — AI parsing…`
+                    : "Preparing batches…"}
                 </>
               ) : (
                 <>
